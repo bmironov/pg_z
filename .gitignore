@@ -1,0 +1,14 @@
+*.o
+*.so
+*.bc
+
+tmp/results/*
+
+# Autotools generated files
+/autom4te.cache/
+/config.log
+/config.status
+/configure
+/configure~
+/Makefile.port
+/pg_z--*.sql

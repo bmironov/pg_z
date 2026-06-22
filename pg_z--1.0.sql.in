@@ -1,0 +1,111 @@
+\echo Use "CREATE EXTENSION pg_z" to load this file. \quit
+
+--
+-- Algorithm: gzip
+--
+
+-- deflate
+@SUPPORT_ZLIB@ CREATE OR REPLACE FUNCTION deflate(uncompressed bytea, compression_level integer default -1)
+@SUPPORT_ZLIB@     RETURNS bytea
+@SUPPORT_ZLIB@     AS 'MODULE_PATHNAME', 'pg_deflate'
+@SUPPORT_ZLIB@     LANGUAGE 'c'
+@SUPPORT_ZLIB@     IMMUTABLE STRICT
+@SUPPORT_ZLIB@     PARALLEL SAFE;
+
+@SUPPORT_ZLIB@ CREATE OR REPLACE FUNCTION deflate(uncompressed text, compression_level integer default -1)
+@SUPPORT_ZLIB@     RETURNS bytea
+@SUPPORT_ZLIB@     AS 'MODULE_PATHNAME', 'pg_deflate'
+@SUPPORT_ZLIB@     LANGUAGE 'c'
+@SUPPORT_ZLIB@     IMMUTABLE STRICT
+@SUPPORT_ZLIB@     PARALLEL SAFE;
+
+-- gzip
+@SUPPORT_ZLIB@ CREATE OR REPLACE FUNCTION gzip(uncompressed bytea, compression_level integer default -1)
+@SUPPORT_ZLIB@     RETURNS bytea
+@SUPPORT_ZLIB@     AS 'MODULE_PATHNAME', 'pg_gzip'
+@SUPPORT_ZLIB@     LANGUAGE 'c'
+@SUPPORT_ZLIB@     IMMUTABLE STRICT
+@SUPPORT_ZLIB@     PARALLEL SAFE;
+
+@SUPPORT_ZLIB@ CREATE OR REPLACE FUNCTION gzip(uncompressed text, compression_level integer default -1)
+@SUPPORT_ZLIB@     RETURNS bytea
+@SUPPORT_ZLIB@     AS 'MODULE_PATHNAME', 'pg_gzip'
+@SUPPORT_ZLIB@     LANGUAGE 'c'
+@SUPPORT_ZLIB@     IMMUTABLE STRICT
+@SUPPORT_ZLIB@     PARALLEL SAFE;
+
+-- inflate
+@SUPPORT_ZLIB@ CREATE OR REPLACE FUNCTION inflate(compressed bytea)
+@SUPPORT_ZLIB@     RETURNS bytea
+@SUPPORT_ZLIB@     AS 'MODULE_PATHNAME', 'pg_inflate'
+@SUPPORT_ZLIB@     LANGUAGE 'c'
+@SUPPORT_ZLIB@     IMMUTABLE STRICT
+@SUPPORT_ZLIB@     PARALLEL SAFE;
+
+-- gunzip
+@SUPPORT_ZLIB@ CREATE OR REPLACE FUNCTION gunzip(compressed bytea)
+@SUPPORT_ZLIB@     RETURNS bytea
+@SUPPORT_ZLIB@     AS 'MODULE_PATHNAME', 'pg_gunzip'
+@SUPPORT_ZLIB@     LANGUAGE 'c'
+@SUPPORT_ZLIB@     IMMUTABLE STRICT
+@SUPPORT_ZLIB@     PARALLEL SAFE;
+
+--
+-- Algorithm: lz4
+--
+
+-- lz4
+@SUPPORT_LZ4@ CREATE OR REPLACE FUNCTION lz4(uncompressed bytea, compression_level integer default 5)
+@SUPPORT_LZ4@     RETURNS bytea
+@SUPPORT_LZ4@     AS 'MODULE_PATHNAME', 'pg_lz4'
+@SUPPORT_LZ4@     LANGUAGE 'c'
+@SUPPORT_LZ4@     IMMUTABLE STRICT
+@SUPPORT_LZ4@     PARALLEL SAFE;
+
+@SUPPORT_LZ4@ CREATE OR REPLACE FUNCTION lz4(uncompressed text, compression_level integer default 5)
+@SUPPORT_LZ4@     RETURNS bytea
+@SUPPORT_LZ4@     AS 'MODULE_PATHNAME', 'pg_lz4'
+@SUPPORT_LZ4@     LANGUAGE 'c'
+@SUPPORT_LZ4@     IMMUTABLE STRICT
+@SUPPORT_LZ4@     PARALLEL SAFE;
+
+-- gunzip
+@SUPPORT_LZ4@ CREATE OR REPLACE FUNCTION unlz4(compressed bytea)
+@SUPPORT_LZ4@     RETURNS bytea
+@SUPPORT_LZ4@     AS 'MODULE_PATHNAME', 'pg_unlz4'
+@SUPPORT_LZ4@     LANGUAGE 'c'
+@SUPPORT_LZ4@     IMMUTABLE STRICT
+@SUPPORT_LZ4@     PARALLEL SAFE;
+
+--
+-- Algorithm: zstd
+--
+-- NOTE: realisation of Zstandard calls with ability to use own multi-threading
+-- deems these functions as PARALLEL UNSAFE to force PostgreSQL to use them in
+-- single worker model, yet Zstd compression can operate in multi-thread mode
+-- at the same time.
+--
+
+-- zstd
+@SUPPORT_ZSTD@ CREATE OR REPLACE FUNCTION zstd(uncompressed bytea, compression_level int DEFAULT 7, threads int DEFAULT 1)
+@SUPPORT_ZSTD@     RETURNS bytea
+@SUPPORT_ZSTD@     AS 'MODULE_PATHNAME', 'pg_zstd'
+@SUPPORT_ZSTD@     LANGUAGE 'c'
+@SUPPORT_ZSTD@     IMMUTABLE STRICT
+@SUPPORT_ZSTD@     PARALLEL UNSAFE;
+
+@SUPPORT_ZSTD@ CREATE OR REPLACE FUNCTION zstd(uncompressed text, compression_level int DEFAULT 7, threads int DEFAULT 1)
+@SUPPORT_ZSTD@     RETURNS bytea
+@SUPPORT_ZSTD@     AS 'MODULE_PATHNAME', 'pg_zstd'
+@SUPPORT_ZSTD@     LANGUAGE 'c'
+@SUPPORT_ZSTD@     IMMUTABLE STRICT
+@SUPPORT_ZSTD@     PARALLEL UNSAFE;
+
+-- unzstd
+@SUPPORT_ZSTD@ CREATE OR REPLACE FUNCTION unzstd(compressed bytea)
+@SUPPORT_ZSTD@     RETURNS bytea
+@SUPPORT_ZSTD@     AS 'MODULE_PATHNAME', 'pg_unzstd'
+@SUPPORT_ZSTD@     LANGUAGE 'c'
+@SUPPORT_ZSTD@     IMMUTABLE STRICT
+@SUPPORT_ZSTD@     PARALLEL UNSAFE;
+

@@ -1,0 +1,110 @@
+CREATE EXTENSION IF NOT EXISTS pg_z;
+-- gzip function tests
+SELECT gzip(NULL) AS gzip_null;
+ gzip_null 
+-----------
+ 
+(1 row)
+
+SELECT gzip('') AS gzip_blank;
+ gzip_blank 
+------------
+ \x
+(1 row)
+
+SELECT gzip('\x00'::bytea) AS gzip_zero;
+                  gzip_zero                   
+----------------------------------------------
+ \x1f8b08000000000000036300008def02d201000000
+(1 row)
+
+SELECT gzip('The quick brown fox jumps over the lazy dog') AS gzip_default;
+                                                          gzip_default                                                          
+--------------------------------------------------------------------------------------------------------------------------------
+ \x1f8b08000000000000030bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a7030039a34f412b000000
+(1 row)
+
+SELECT gzip('The quick brown fox jumps over the lazy dog'::bytea) AS gzip_default;
+                                                          gzip_default                                                          
+--------------------------------------------------------------------------------------------------------------------------------
+ \x1f8b08000000000000030bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a7030039a34f412b000000
+(1 row)
+
+SELECT gzip('The quick brown fox jumps over the lazy dog'::text) AS gzip_default;
+                                                          gzip_default                                                          
+--------------------------------------------------------------------------------------------------------------------------------
+ \x1f8b08000000000000030bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a7030039a34f412b000000
+(1 row)
+
+SELECT gzip('The quick brown fox jumps over the lazy dog'::bytea, 8) AS gzip_8;
+                                                             gzip_8                                                             
+--------------------------------------------------------------------------------------------------------------------------------
+ \x1f8b08000000000000030bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a7030039a34f412b000000
+(1 row)
+
+WITH str AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', 10000) AS str
+)
+SELECT convert_from(gunzip(gzip(str)), 'utf8') = str AS gunzip_long FROM str;
+ gunzip_long 
+-------------
+ t
+(1 row)
+
+WITH strs AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', generate_series(1, 1000)) AS str
+)
+SELECT sum((str = convert_from(gunzip(gzip(str)), 'utf8'))::integer) AS gunzip_strings
+FROM strs;
+ gunzip_strings 
+----------------
+           1000
+(1 row)
+
+-- incorrect compression_level (out of range -1..9) should cause error
+SELECT gzip('The quick brown fox jumps over the lazy dog'::bytea, -2) AS gzip_err_1;
+ERROR:  invalid compression level (outside of -1..9): -2
+SELECT gzip('The quick brown fox jumps over the lazy dog'::bytea, 10) AS gzip_err_2;
+ERROR:  invalid compression level (outside of -1..9): 10
+-- gunzip function tests
+SELECT convert_from(gunzip(gzip('The quick brown fox jumps over the lazy dog')), 'utf8') AS gunzip_ok;
+                  gunzip_ok                  
+---------------------------------------------
+ The quick brown fox jumps over the lazy dog
+(1 row)
+
+SELECT gunzip(''::bytea) AS gunzip_blank;
+ gunzip_blank 
+--------------
+ \x
+(1 row)
+
+SELECT gunzip('\x00'::bytea) AS gunzip_8;
+ERROR:  error during decompression: -5
+SELECT gunzip('\x0000'::bytea) AS gunzip_16;
+ERROR:  error during decompression: -3
+SELECT gunzip('fubar'::bytea) AS gunzip_16;
+ERROR:  error during decompression: -3
+SELECT gunzip(gzip('\x00000000000000000000'::bytea)) AS gzip_roundtrip_zero;
+  gzip_roundtrip_zero   
+------------------------
+ \x00000000000000000000
+(1 row)
+
+-- error propagation
+SELECT gunzip(gzip('The quick brown fox jumps over the lazy dog'::bytea, -2)) AS gunzip_err_1;
+ERROR:  invalid compression level (outside of -1..9): -2
+SELECT gunzip(gzip('The quick brown fox jumps over the lazy dog'::bytea, 10)) AS gunzip_err_2;
+ERROR:  invalid compression level (outside of -1..9): 10
+-- check limit set by DB parameter
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = 1000;
+SELECT gunzip(gzip(repeat('?', 1100)::bytea)) AS gunzip_overlimit;
+ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+RESET pg_z.max_size;
+DROP EXTENSION pg_z;

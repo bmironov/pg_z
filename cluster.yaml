@@ -1,0 +1,25 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: dynamic-extension-cluster
+spec:
+  instances: 3
+
+  # Use the standard, minimal, secure official image provided by CNPG
+  imageName: ghcr.io/cloudnative-pg/postgresql:18
+
+  storage:
+    size: 10Gi
+
+  postgresql:
+    parameters:
+      # Preload the library if required by your extension's hooks
+      shared_preload_libraries: "pg_z"
+
+    # Define the OCI image extensions to mount via Kubernetes ImageVolume
+    extensions:
+      - name: pg_z
+        image: ://my-registry.com
+        # Instruct CNPG to inject this specific directory into LD_LIBRARY_PATH
+        ld_library_path: "/extensions/pg_z/system"
+

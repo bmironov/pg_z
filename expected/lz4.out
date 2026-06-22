@@ -1,0 +1,110 @@
+CREATE EXTENSION IF NOT EXISTS pg_z;
+-- lz4 function tests
+SELECT lz4(NULL) AS lz4_null;
+ lz4_null 
+----------
+ 
+(1 row)
+
+SELECT lz4('') AS lz4_blank;
+ lz4_blank 
+-----------
+ \x
+(1 row)
+
+SELECT lz4('\x00'::bytea) AS lz4_zero;
+                      lz4_zero                      
+----------------------------------------------------
+ \x04224d1848700100000000000000dc010000800000000000
+(1 row)
+
+SELECT lz4('The quick brown fox jumps over the lazy dog') AS lz4_default;
+                                                              lz4_default                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ \x04224d1848702b000000000000002f2b00008054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f6700000000
+(1 row)
+
+SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea) AS lz4_default;
+                                                              lz4_default                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ \x04224d1848702b000000000000002f2b00008054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f6700000000
+(1 row)
+
+SELECT lz4('The quick brown fox jumps over the lazy dog'::text) AS lz4_default;
+                                                              lz4_default                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ \x04224d1848702b000000000000002f2b00008054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f6700000000
+(1 row)
+
+SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea, 8) AS lz4_8;
+                                                                 lz4_8                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------
+ \x04224d1848702b000000000000002f2b00008054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f6700000000
+(1 row)
+
+WITH str AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', 10000) AS str
+)
+SELECT convert_from(unlz4(lz4(str)), 'utf8') = str AS unlz4_long FROM str;
+ unlz4_long 
+------------
+ t
+(1 row)
+
+WITH strs AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', generate_series(1, 1000)) AS str
+)
+SELECT sum((str = convert_from(unlz4(lz4(str)), 'utf8'))::integer) AS unlz4_strings
+FROM strs;
+ unlz4_strings 
+---------------
+          1000
+(1 row)
+
+-- incorrect compression_level (out of range 0..12) should cause error
+SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea, -2) AS lz4_err_1;
+ERROR:  compression level must be in range 0..12
+SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea, 13) AS lz4_err_2;
+ERROR:  compression level must be in range 0..12
+-- unlz4 function tests
+SELECT convert_from(unlz4(lz4('The quick brown fox jumps over the lazy dog')), 'utf8') AS unlz4_ok;
+                  unlz4_ok                   
+---------------------------------------------
+ The quick brown fox jumps over the lazy dog
+(1 row)
+
+SELECT unlz4(''::bytea) AS unlz4_blank;
+ unlz4_blank 
+-------------
+ \x
+(1 row)
+
+SELECT unlz4('\x00'::bytea) AS unlz4_8;
+ERROR:  failed to read LZ4 frame info: ERROR_frameHeader_incomplete
+SELECT unlz4('\x0000'::bytea) AS unlz4_16;
+ERROR:  failed to read LZ4 frame info: ERROR_frameHeader_incomplete
+SELECT unlz4('fubar'::bytea) AS unlz4_16;
+ERROR:  failed to read LZ4 frame info: ERROR_frameType_unknown
+SELECT unlz4(lz4('\x00000000000000000000'::bytea)) AS lz4_roundtrip_zero;
+   lz4_roundtrip_zero   
+------------------------
+ \x00000000000000000000
+(1 row)
+
+-- error propagation
+SELECT unlz4(lz4('The quick brown fox jumps over the lazy dog'::bytea, -2)) AS unlz4_err_1;
+ERROR:  compression level must be in range 0..12
+SELECT unlz4(lz4('The quick brown fox jumps over the lazy dog'::bytea, 13)) AS unlz4_err_2;
+ERROR:  compression level must be in range 0..12
+-- check limit set by DB parameter
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = 1000;
+SELECT unlz4(lz4(repeat('?', 1100)::bytea)) AS unlz4_overlimit;
+ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+RESET pg_z.max_size;
+DROP EXTENSION pg_z;

@@ -1,0 +1,134 @@
+{
+   postgres_core_memory_allocations
+   Memcheck:Leak
+   fun:malloc
+   obj:*/bin/postgres
+}
+
+{
+   postgres_core_reallocations
+   Memcheck:Leak
+   fun:realloc
+   obj:*/bin/postgres
+}
+
+{
+   postgres_internal_aset_alloc
+   Memcheck:Leak
+   fun:AllocSetAlloc
+   obj:*/bin/postgres
+}
+
+{
+   postgres_internal_generation_alloc
+   Memcheck:Leak
+   fun:GenerationAlloc
+   obj:*/bin/postgres
+}
+
+{
+   system_libc_and_runtime_leaks
+   Memcheck:Leak
+   fun:malloc
+   obj:*/libc-*.so
+}
+
+{
+   system_ld_loader_leaks
+   Memcheck:Leak
+   fun:malloc
+   obj:*/ld-*.so
+}
+
+{
+   system_mmap_initializations_noise
+   Memcheck:Param
+   write(buf)
+   fun:invalid_call_or_syscall
+   obj:*/bin/postgres
+}
+
+{
+   openssl_crypto_internal_allocations
+   Memcheck:Leak
+   fun:malloc
+   obj:*/libcrypto.so.*
+}
+
+{
+   openssl_ssl_internal_allocations
+   Memcheck:Leak
+   fun:realloc
+   obj:*/libssl.so.*
+}
+
+{
+   openssl_cipher_list_init
+   Memcheck:Leak
+   fun:realloc
+   obj:*/libcrypto.so.*
+   fun:OPENSSL_sk_insert
+   obj:*/libssl.so.*
+   fun:SSL_CTX_set_cipher_list
+   fun:be_tls_init
+   obj:*/bin/postgres
+}
+
+{
+   postgres_tls_init_leak_noise
+   Memcheck:Leak
+   fun:realloc
+   fun:???
+   obj:*/libcrypto.so.*
+   obj:*/libssl.so.*
+   fun:SSL_CTX_new_ex
+   fun:be_tls_init
+   obj:*/bin/postgres
+}
+{
+   postgres_save_ps_display_args_leak
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:save_ps_display_args
+   obj:*/bin/postgres
+}
+
+{
+   linux_dlopen_internal_allocations
+   Memcheck:Leak
+   fun:calloc
+   fun:calloc
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+}
+
+{
+   linux_glibc_dlopen_global_resize_noise
+   Memcheck:Leak
+   fun:malloc
+   fun:malloc
+   fun:add_to_global_resize
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+}
+
+{
+   linux_glibc_dlopen_check_versions_noise
+   Memcheck:Leak
+   fun:calloc
+   fun:calloc
+   fun:_dl_check_map_versions
+   fun:dl_open_worker_begin
+   fun:_dl_catch_exception
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:dlopen_doit
+}
+

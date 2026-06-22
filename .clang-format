@@ -1,0 +1,15 @@
+BasedOnStyle: LLVM
+Language: Cpp
+ColumnLimit: 79
+IndentWidth: 4
+TabWidth: 4
+UseTab: Always
+ContinuationIndentWidth: 8
+AllowAllParametersOfDeclarationOnNextLine: true
+AlwaysBreakAfterReturnType: AllDefinitions
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: AlwaysBreak
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
