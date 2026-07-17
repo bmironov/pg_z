@@ -61,6 +61,7 @@ All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
 ### `deflate`
 
 deflate ( uncompressed bytea \[, compression_level integer \] ) → bytea
+
 deflate ( uncompressed text \[, compression_level integer \] ) → bytea
 
 #### Description
@@ -118,6 +119,7 @@ SELECT convert_from(inflate(deflate('hello world')), 'UTF8');
 ### `gzip`
 
 gzip ( uncompressed bytea \[, compression_level integer \] ) → bytea
+
 gzip ( uncompressed text \[, compression_level integer \] ) → bytea
 
 #### Description
@@ -179,6 +181,7 @@ All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
 ### `lz4`
 
 lz4 ( uncompressed bytea \[, compression_level integer \] ) → bytea
+
 lz4 ( uncompressed text \[, compression_level integer \] ) → bytea
 
 #### Description
@@ -244,6 +247,7 @@ layer and the internal multithreading logic of the Zstandard library.
 ### `zstd`
 
 zstd ( uncompressed bytea \[, compression_level integer \[, threads integer \] \] ) → bytea
+
 zstd ( uncompressed text \[, compression_level integer \[, threads integer \] \] ) → bytea
 
 #### Description
