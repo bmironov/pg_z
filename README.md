@@ -2,6 +2,21 @@
 
 <!-- toc -->
 
+- [Requirements for the `pg_z` Extension](#requirements-for-the-pg_z-extension)
+- [Database Parameter `pg_z.max_size`](#database-parameter-pg_zmax_size)
+- [Functions Provided by This Extension](#functions-provided-by-this-extension)
+- [Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`](#usage-of-postgresql-v18-ability-to-install-extensions-without-sudo)
+- [Compiling the Extension with Debug Information](#compiling-the-extension-with-debug-information)
+- [Supplied Unit Tests for `pg_z` Functions](#supplied-unit-tests-for-pg_z-functions)
+- [Highlights of `pg_z` extension](#highlights-of-pg_z-extension)
+    * [Zero-Copy Architecture](#zero-copy-architecture)
+    * [Decompression Bomb Protection and Size Estimation](#decompression-bomb-protection-and-size-estimation)
+    * [PostgreSQL-Integrated Memory Management & Parallel Safety](#postgresql-integrated-memory-management--parallel-safety)
+    * [Static Huge Pages Support](#static-huge-pages-support)
+    * [Tuple-Scoped Context Lifecycle](#tuple-scoped-context-lifecycle)
+- [How to Pronounce `pg_z`](#how-to-pronounce-pg_z)
+
+<!-- tocstop -->
 
 The development of this extension was inspired by Paul Ramsey’s [`pgsql‑gzip`][1]
 project.
@@ -95,7 +110,7 @@ compression algorithms:
     * unzstd
 
 Detailed definitions and usage examples for these functions can be found in
-`USAGE.md`.
+[USAGE.md][4].
 
 
 ## Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`
@@ -235,3 +250,4 @@ a universal reference to compression as in `.Z` file type.
 [1]: https://github.com/pramsey/pgsql-gzip
 [2]: https://cloudnative-pg.io/
 [3]: https://www.postgresql.org/docs/current/extend-pgxs.html
+[4]: USAGE.md
