@@ -14,6 +14,7 @@
     * [PostgreSQL-Integrated Memory Management & Parallel Safety](#postgresql-integrated-memory-management--parallel-safety)
     * [Static Huge Pages Support](#static-huge-pages-support)
     * [Tuple-Scoped Context Lifecycle](#tuple-scoped-context-lifecycle)
+- [Preparing Static Huge Memory Pages (HMP) on the System](#preparing-static-huge-memory-pages-hmp-on-the-system)
 - [How to Pronounce `pg_z`](#how-to-pronounce-pg_z)
 
 <!-- tocstop -->
@@ -239,6 +240,43 @@ processed, all memory allocated by the extension's functions is automatically
 freed. This approach is highly resource-efficient compared to attaching
 allocations to the **Transaction Context**, where a single transaction
 processing millions of tuples would otherwise cause massive memory bloat.
+
+
+## Preparing Static Huge Memory Pages (HMP) on the System
+
+The Memory Manager of this extension can allocate static HMP (usually 2MB on
+Linux systems) to optimize performance. They will be taken from the available
+pool of such pages for the duration of a single tuple processing and then
+returned. If this pool is exhausted or not available at all, the Memory Manager
+will allocate the necessary RAM using standard pages (4kB in size).
+
+To minimize fragmentation, the allocation of static HMP is done by rounding up
+the requested size to the nearest full page size.
+
+All memory allocations smaller than the size of a static HMP are done via the
+PostgreSQL `palloc_extended` function with the `MCXT_ALLOC_NO_OOM` flag to
+prevent fatal errors and gracefully return `NULL`.
+
+Since `pg_z` uses its own set of static HMP, you need to account for that and
+allocate extra pages on top of the pages required by PostgreSQL itself. Their
+quantity can be calculated roughly as follows:
+
+```
+N = A * D / S,
+where
+N - number of HMPs
+A - number of active parallel compression / decompression calls
+D - average size of decompressed document in bytes
+S - size of an HMP in bytes
+```
+
+Monitoring can be done as follows:
+
+```bash
+grep HugePages_Free /proc/mem
+```
+
+It is highly recommended to have more than zero free HMPs on such a system.
 
 
 ## How to Pronounce `pg_z`
