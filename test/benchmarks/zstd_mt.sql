@@ -28,7 +28,7 @@ SELECT
         || ' id tristique. Quisque nunc libero, sagittis vitae augue sit amet,'
         || ' mollis vulputate augue. Mauris vitae facilisis purus, id cursus '
         || ' turpis. Sed ultrices hendrerit mauris non eleifend.'
-        || CHR(10), 12000) AS sample_data;
+        || CHR(10), 1000000) AS sample_data;
 
 -- Force table statistics optimization so the engine maps execution structures efficiently
 VACUUM ANALYZE zstd_cache_bench;
@@ -46,27 +46,27 @@ FROM zstd_cache_bench;
 
 SELECT /* THREAD_COUNT: 1 */ count(*) AS threads_1 FROM
     (SELECT zstd(sample_data, 3, 1)
-        FROM zstd_cache_bench, generate_series(1, 10000)
+        FROM zstd_cache_bench, generate_series(1, 10000000)
     )
 AS threads_1;
 
 
 SELECT /* THREAD_COUNT: 2 */ count(*) AS threads_2 FROM
     (SELECT zstd(sample_data, 3, 2)
-        FROM zstd_cache_bench, generate_series(1, 10000)
+        FROM zstd_cache_bench, generate_series(1, 10000000)
     )
 AS threads_2;
 
 
 SELECT /* THREAD_COUNT: 4 */ count(*) AS threads_4 FROM
     (SELECT zstd(sample_data, 3, 4)
-        FROM zstd_cache_bench, generate_series(1, 10000)
+        FROM zstd_cache_bench, generate_series(1, 10000000)
     )
 AS threads_4;
 
 SELECT /* THREAD_COUNT: 8 */ count(*) AS threads_8 FROM
     (SELECT zstd(sample_data, 3, 8)
-        FROM zstd_cache_bench, generate_series(1, 10000)
+        FROM zstd_cache_bench, generate_series(1, 10000000)
     )
 AS threads_8;
 
