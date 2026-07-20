@@ -5,7 +5,7 @@ MODULE_big = pg_z
 BUILD_DIR = tmp
 SRC_MODULES = pg_z mem_manager gzip lz4 zstd
 
-REGRESS = gzip deflate lz4 zstd
+REGRESS = gzip deflate lz4 zstd db_params
 
 
 ifeq ($(filter $(BUILD_DIR),$(notdir $(CURDIR))),)

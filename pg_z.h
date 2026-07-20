@@ -32,10 +32,11 @@ munmap(void *addr, size_t length)
 }
 #endif
 
-#define CHUNK_SIZE (256 * 1024) /* memory allocation chunk size of 256K */
+// GUC: memory allocation chunk size
+extern size_t memory_chunk_size;
 
 // GUC: maximum size of decompressed data in bytes; -1 = unlimited
-extern int max_uncompressed_size;
+extern size_t max_uncompressed_size;
 
 /*
  * ===============================================================

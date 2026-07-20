@@ -67,7 +67,7 @@ pg_zstd(PG_FUNCTION_ARGS)
 	if (max_uncompressed_size >= 0 && in_size > max_uncompressed_size) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
-			 "input data is limited by pg_z.max_size (%d bytes)",
+			 "input data is limited by pg_z.max_size (%zu bytes)",
 			 max_uncompressed_size);
 	}
 
@@ -189,7 +189,7 @@ pg_unzstd(PG_FUNCTION_ARGS)
 
 	if (max_uncompressed_size >= 0 && uncomp_size > max_uncompressed_size)
 		elog(ERROR,
-			 "decompressed output exceeds pg_z.max_size (%d bytes)",
+			 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 			 max_uncompressed_size);
 
 	if (ZSTD_isError(uncomp_size))

@@ -3,7 +3,9 @@
 <!-- toc -->
 
 - [Requirements for the `pg_z` Extension](#requirements-for-the-pg_z-extension)
-- [Database Parameter `pg_z.max_size`](#database-parameter-pg_zmax_size)
+- [Database Parameters](#database-parameters)
+    * [`pg_z.max_size`](#pg_zmax_size)
+    * [`pg_z.mem_chunk_size`](#pg_zmem_chunk_size)
 - [Functions Provided by This Extension](#functions-provided-by-this-extension)
 - [Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`](#usage-of-postgresql-v18-ability-to-install-extensions-without-sudo)
 - [Compiling the Extension with Debug Information](#compiling-the-extension-with-debug-information)
@@ -32,14 +34,14 @@ to use modern compression algorithms (`LZ4`, `Zstandard`) to minimize the CPU
 load during data retrieval. This approach provides a better storage efficiency
 at the cost of slightly higher CPU usage during compression.
 
-
 ## Requirements for the `pg_z` Extension
 
 The `pg_z` extension requires three libraries and their development headers to
 be installed on the system to compile into a `.so` file:
-* `zlib` (to support the `gzip` and `deflate` algorithms);
-* `lz4` (to support `LZ4`);
-* `zstd` (to support `Zstandard`).
+
+- `zlib` (to support the `gzip` and `deflate` algorithms);
+- `lz4` (to support `LZ4`);
+- `zstd` (to support `Zstandard`).
 
 Once all required libraries and their development headers are installed, run
 the following commands to generate the build scripts and configure the
@@ -63,21 +65,23 @@ builds an image containing all the necessary files to deploy the `pg_z`
 extension along with the required system libraries. This image can then be
 attached to a vanilla PostgreSQL v18+ instance running under `cnpg`.
 
+## Database Parameters
 
-## Database Parameter `pg_z.max_size`
+### `pg_z.max_size`
 
 This extension introduces the database parameter `pg_z.max_size`, which allows
 you to set a limit on the maximum uncompressed data size in bytes. This is
 helpful for protecting the system from processing abnormally large data chunks.
 Note that PostgreSQL also has a hard limit on the size of a TOASTed value,
 which is set to ~1 GB (2^30 - 1 bytes). Multiple factors affect this, such as:
-* TOAST's internal compression (controlled by the `default_toast_compression`
+
+- TOAST's internal compression (controlled by the `default_toast_compression`
 parameter);
-* Double compression (storing already compressed data within a compressed TOAST
+- Double compression (storing already compressed data within a compressed TOAST
 column);
-* The efficiency of the original data compression achieved by this extension's
+- The efficiency of the original data compression achieved by this extension's
 functions;
-* etc.
+- etc.
 
 By default, this value is set to `256MB`, which is more than enough for most
 use cases. You can adjust it to any value suitable for your needs. All
@@ -90,6 +94,16 @@ partially decompressed data will be discarded.
 
 To disable the uncompressed data size limit check, set `pg_z.max_size = -1`.
 
+### `pg_z.mem_chunk_size`
+
+This extension introduces the database parameter `pg_z.mem_chunk_size`, which
+allows you to set the standard size of the memory chunk by which memory is
+allocated and later released for compression and decompression functions. Using
+this uniform size minimizes memory fragmentation. It is recommended to set this
+value to the most common size of processed documents in the system.
+
+For smaller sizes, the value should be a multiple of 8 KB. If you use static
+Huge Pages, then adjust the value to multiples of the Huge Page size used.
 
 ## Functions Provided by This Extension
 
@@ -97,22 +111,21 @@ The `pg_z` extension provides several functions for working with compressed
 data. These functions are categorized into groups based on their underlying
 compression algorithms:
 
-* gzip
-    * gzip
-    * gunzip (aka ungzip)
-* deflate
-    * deflate
-    * inflate
-* LZ4
-    * lz4
-    * unlz4
-* Zstandard
-    * zstd
-    * unzstd
+- gzip
+  - gzip
+  - gunzip (aka ungzip)
+- deflate
+  - deflate
+  - inflate
+- LZ4
+  - lz4
+  - unlz4
+- Zstandard
+  - zstd
+  - unzstd
 
 Detailed definitions and usage examples for these functions can be found in
 [USAGE.md][4].
-
 
 ## Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`
 
@@ -148,7 +161,6 @@ SELECT pg_reload_conf();
 This is quite handy when running PostgreSQL under the modern `cnpg`
 ([CloudNativePG][2]) Kubernetes operator.
 
-
 ## Compiling the Extension with Debug Information
 
 The `Makefile` provided with this extension includes a special `debug` target to
@@ -158,7 +170,6 @@ Simply run:
 ```bash
 make debug
 ```
-
 
 ## Supplied Unit Tests for `pg_z` Functions
 
@@ -185,18 +196,19 @@ ok 1         - gzip                                       73 ms
 ok 2         - deflate                                    57 ms
 ok 3         - lz4                                        26 ms
 ok 4         - zstd                                       33 ms
-1..4
-# All 4 tests passed
+ok 5         - db_params                                   9 ms
+1..5
+# All 5 tests passed
 ```
 
 Since the tests are similar in nature, the difference in execution time between
 the supplied compression and decompression algorithms is quite visible and
 directly points to the performance of these algorithms.
 
-
 ## Highlights of `pg_z` extension
 
 ### Zero-Copy Architecture
+
 The extension uses a zero-copy methodology where results are accumulated
 directly within a single memory region. This eliminates the need to copy data
 to another buffer before returning it to the requester. This approach provides
@@ -204,6 +216,7 @@ significant performance benefits when processing multi-megabyte documents such
 as log files, JSON, or XML.
 
 ### Decompression Bomb Protection and Size Estimation
+
 Extra care is taken to prevent "decompression bombs" in the `gunzip` function.
 Because the Gzip standard does not embed the original data size, standard
 implementations are prone to either memory under-allocation or massive
@@ -217,6 +230,7 @@ the start. The implementation carefully balances this initial chunk size to
 ensure high performance for both small and large documents.
 
 ### PostgreSQL-Integrated Memory Management & Parallel Safety
+
 All supported compression algorithms (`gzip`, `lz4`, and `zstd`) leverage
 custom allocators tied directly into the PostgreSQL memory manager. This
 architecture prevents memory leaks and enables specialized allocation
@@ -228,19 +242,20 @@ outside of PostgreSQL's control, `zstd`-related functions are marked as
 **`PARALLEL UNSAFE`**.
 
 ### Static Huge Pages Support
+
 The extension's custom memory manager supports the allocation of Static Huge
 Pages. This dramatically boosts performance for large documents by allocating
 memory in 2 MB chunks instead of standard 4 KB pages, significantly reducing
 TLB cache misses.
 
 ### Tuple-Scoped Context Lifecycle
+
 The custom memory manager is attached to **`CurrentMemoryContext`**, which
 lives only for the duration of processing a single tuple. Once the tuple is
 processed, all memory allocated by the extension's functions is automatically
 freed. This approach is highly resource-efficient compared to attaching
 allocations to the **Transaction Context**, where a single transaction
 processing millions of tuples would otherwise cause massive memory bloat.
-
 
 ## Preparing Static Huge Memory Pages (HMP) on the System
 
@@ -280,12 +295,10 @@ grep HugePages_Free /proc/mem
 
 It is highly recommended to have more than zero free HMPs on such a system.
 
-
 ## How to Pronounce `pg_z`
 
 I'm glad you asked. It is pronounced as "pee-gee-zee" and letter "Z" stands for
 a universal reference to compression as in `.Z` file type.
-
 
 [1]: https://github.com/pramsey/pgsql-gzip
 [2]: https://cloudnative-pg.io/

@@ -219,42 +219,36 @@ void *
 pg_hybrid_alloc(size_t size)
 {
 	void *ptr;
-	bool is_huge = true;
+	size_t huge_size; // separate size rounded up to Huge Page size
 
-	if (size < huge_page_size) {
-		if (size >= CHUNK_SIZE) {
-			// rounding up size to closest CHUNK_SIZE multiple
-			size = (size + (CHUNK_SIZE - 1)) & ~(CHUNK_SIZE - 1);
+	if (size > memory_chunk_size) {
+		// rounding up size to closest memory_chunk_size multiple
+		size = (size + (memory_chunk_size - 1)) & ~(memory_chunk_size - 1);
+	}
+
+	if (size >= huge_page_size) {
+		// Round up size to closest Huge Page size multiple
+		huge_size = (size + (huge_page_size - 1)) & ~(huge_page_size - 1);
+		ptr =
+				mmap(NULL,
+					 huge_size,
+					 PROT_READ | PROT_WRITE,
+					 MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
+					 -1,
+					 0);
+
+		if (ptr != MAP_FAILED) {
+			pg_mem_tracker_register(ptr, huge_size, true);
+			return ptr;
 		}
-
-		ptr = palloc_extended(size, MCXT_ALLOC_NO_OOM);
-		if (ptr == NULL)
-			return NULL;
-
-		if (size >= CHUNK_SIZE)
-			pg_mem_tracker_register(ptr, size, false);
-		return ptr;
 	}
 
-	// Round up size to closest Huge Page size multiple
-	size = (size + (huge_page_size - 1)) & ~(huge_page_size - 1);
-	ptr =
-			mmap(NULL,
-				 size,
-				 PROT_READ | PROT_WRITE,
-				 MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
-				 -1,
-				 0);
+	ptr = palloc_extended(size, MCXT_ALLOC_NO_OOM);
+	if (ptr == NULL)
+		return NULL;
 
-	if (ptr == MAP_FAILED) {
-		ptr = palloc_extended(size, MCXT_ALLOC_NO_OOM);
-		if (ptr == NULL)
-			return NULL;
-
-		is_huge = false;
-	}
-
-	pg_mem_tracker_register(ptr, size, is_huge);
+	if (size >= memory_chunk_size) // Don't track small allocations
+		pg_mem_tracker_register(ptr, size, false);
 	return ptr;
 }
 
@@ -274,7 +268,7 @@ pg_hybrid_repalloc(void *address, size_t prev_size, size_t new_size)
 
 	old_idx = pg_mem_tracker_find_index(address);
 	if (old_idx < 0) {
-		if (new_size < CHUNK_SIZE)
+		if (new_size < memory_chunk_size)
 			return repalloc(address, new_size);
 
 		old_size = prev_size;

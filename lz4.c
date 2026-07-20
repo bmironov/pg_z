@@ -68,7 +68,7 @@ pg_lz4(PG_FUNCTION_ARGS)
 		in_size > (size_t)max_uncompressed_size) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
-			 "input data is limited by pg_z.max_size (%d bytes)",
+			 "input data is limited by pg_z.max_size (%zu bytes)",
 			 max_uncompressed_size);
 	}
 
@@ -251,7 +251,7 @@ pg_unlz4(PG_FUNCTION_ARGS)
 			LZ4F_freeDecompressionContext(dCtx);
 			PG_FREE_IF_COPY(in_varlena, 0);
 			elog(ERROR,
-				 "decompressed output exceeds pg_z.max_size (%d bytes)",
+				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 				 max_uncompressed_size);
 		}
 
@@ -261,10 +261,12 @@ pg_unlz4(PG_FUNCTION_ARGS)
 		if (ret > 0 && src_size_left > 0 &&
 			(allocated_size - VARHDRSZ == total_decompressed)) {
 
-			allocated_size += CHUNK_SIZE;
+			allocated_size += memory_chunk_size;
 
 			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf, allocated_size - CHUNK_SIZE, allocated_size);
+					out_buf,
+					allocated_size - memory_chunk_size,
+					allocated_size);
 			if (tmp_buf == NULL) {
 				LZ4F_freeDecompressionContext(dCtx);
 				PG_FREE_IF_COPY(in_varlena, 0);

@@ -53,7 +53,7 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 
 	if (max_uncompressed_size >= 0 && in_size > max_uncompressed_size)
 		elog(ERROR,
-			 "input data is limited by pg_z.max_size (%d bytes)",
+			 "input data is limited by pg_z.max_size (%zu bytes)",
 			 max_uncompressed_size);
 
 	/*
@@ -84,8 +84,9 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 
 	// rough estimate for gzip format
 	allocated_size = in_size + (in_size / 1000) + 32 + VARHDRSZ;
-	// anti-fragmentation round up to next multiple of CHUNK_SIZE
-	allocated_size = (allocated_size + (CHUNK_SIZE - 1)) & ~(CHUNK_SIZE - 1);
+	// anti-fragmentation round up to next multiple of memory chunk size
+	allocated_size = (allocated_size + (memory_chunk_size - 1)) &
+					 ~(memory_chunk_size - 1);
 
 	out_buf = (uint8 *)pg_hybrid_alloc(allocated_size);
 	if (out_buf == NULL) {
@@ -107,9 +108,11 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 		 * and no more space left in the out_buf (zs.avail_out == 0)
 		 */
 		if (ret == Z_OK && zs.avail_out == 0) {
-			allocated_size += CHUNK_SIZE;
+			allocated_size += memory_chunk_size;
 			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf, allocated_size - CHUNK_SIZE, allocated_size);
+					out_buf,
+					allocated_size - memory_chunk_size,
+					allocated_size);
 			if (tmp_buf == NULL) {
 				deflateEnd(&zs);
 				PG_FREE_IF_COPY(in_varlena, 0);
@@ -230,8 +233,9 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 
 	// rough estimation to prevent memory overallocation
 	allocated_size = in_size * 5;
-	// anti-fragmentation round up to next multiple of CHUNK_SIZE
-	allocated_size = (allocated_size + (CHUNK_SIZE - 1)) & ~(CHUNK_SIZE - 1);
+	// anti-fragmentation round up to next multiple of memory chunk size
+	allocated_size = (allocated_size + (memory_chunk_size - 1)) &
+					 ~(memory_chunk_size - 1);
 
 	out_buf = (uint8 *)palloc_extended(allocated_size, MCXT_ALLOC_NO_OOM);
 	if (out_buf == NULL) {
@@ -255,15 +259,17 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 			PG_FREE_IF_COPY(in_varlena, 0);
 
 			elog(ERROR,
-				 "decompressed output exceeds pg_z.max_size (%d bytes)",
+				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 				 max_uncompressed_size);
 		}
 
 		if (ret == Z_OK && zs.avail_out == 0) {
 			// double size of allocation to minimize number of repalloc calls
-			allocated_size += CHUNK_SIZE;
+			allocated_size += memory_chunk_size;
 			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf, allocated_size - CHUNK_SIZE, allocated_size);
+					out_buf,
+					allocated_size - memory_chunk_size,
+					allocated_size);
 			if (tmp_buf == NULL) {
 				inflateEnd(&zs);
 				PG_FREE_IF_COPY(in_varlena, 0);
