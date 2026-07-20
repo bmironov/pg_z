@@ -59,6 +59,10 @@ SELECT gzip(raw_text, 6) AS compressed_data FROM temp_benchmark_data;
 SELECT octet_length(gunzip(compressed_data)) AS decompressed_gzip_bytes
 FROM temp_compressed_gzip;
 
+\echo 'UNGZIP started...'
+SELECT octet_length(ungzip(compressed_data)) AS decompressed_gzip_bytes
+FROM temp_compressed_gzip;
+
 
 -- ============================================================================
 -- Test 2: benchmark LZ4

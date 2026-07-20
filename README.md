@@ -99,7 +99,7 @@ compression algorithms:
 
 * gzip
     * gzip
-    * gunzip
+    * gunzip (aka ungzip)
 * deflate
     * deflate
     * inflate
@@ -247,8 +247,10 @@ processing millions of tuples would otherwise cause massive memory bloat.
 The Memory Manager of this extension can allocate static HMP (usually 2MB on
 Linux systems) to optimize performance. They will be taken from the available
 pool of such pages for the duration of a single tuple processing and then
-returned. If this pool is exhausted or not available at all, the Memory Manager
-will allocate the necessary RAM using standard pages (4kB in size).
+returned. Thanks to this, the Memory Manager is not affected by queries running
+on multiple partitions. If the system page pool is exhausted or not available
+at all, the Memory Manager will allocate the necessary RAM using standard pages
+(4kB in size).
 
 To minimize fragmentation, the allocation of static HMP is done by rounding up
 the requested size to the nearest full page size.

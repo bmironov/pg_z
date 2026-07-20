@@ -144,7 +144,7 @@ SELECT gzip('hello world'::bytea, 9);
 
 ***
 
-### `gunzip`
+### `gunzip` (aka `ungzip`)
 
 gunzip ( compressed bytea ) → bytea
 
@@ -152,6 +152,10 @@ gunzip ( compressed bytea ) → bytea
 
 Decompresses a gzip-wrapped byte stream complying with RFC 1952 back into its
 original binary layout.
+
+`ungzip` is just a synonym for `gunzip` to keep the "un" prefix in front of
+the algorithm's name, maintaining consistency with other cases.
+
 
 #### Usage Notes
 
