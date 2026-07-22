@@ -1,6 +1,33 @@
 \echo Use "CREATE EXTENSION pg_z" to load this file. \quit
 
 --
+-- Algorithm: brotli
+--
+
+-- brotli
+@SUPPORT_BROTLI@ CREATE OR REPLACE FUNCTION brotli(uncompressed bytea, compression_level integer default 3)
+@SUPPORT_BROTLI@     RETURNS bytea
+@SUPPORT_BROTLI@     AS 'MODULE_PATHNAME', 'pg_brotli'
+@SUPPORT_BROTLI@     LANGUAGE 'c'
+@SUPPORT_BROTLI@     IMMUTABLE STRICT
+@SUPPORT_BROTLI@     PARALLEL SAFE;
+
+@SUPPORT_BROTLI@ CREATE OR REPLACE FUNCTION brotli(uncompressed text, compression_level integer default 3)
+@SUPPORT_BROTLI@     RETURNS bytea
+@SUPPORT_BROTLI@     AS 'MODULE_PATHNAME', 'pg_brotli'
+@SUPPORT_BROTLI@     LANGUAGE 'c'
+@SUPPORT_BROTLI@     IMMUTABLE STRICT
+@SUPPORT_BROTLI@     PARALLEL SAFE;
+
+-- unbrotli
+@SUPPORT_BROTLI@ CREATE OR REPLACE FUNCTION unbrotli(compressed bytea)
+@SUPPORT_BROTLI@     RETURNS bytea
+@SUPPORT_BROTLI@     AS 'MODULE_PATHNAME', 'pg_unbrotli'
+@SUPPORT_BROTLI@     LANGUAGE 'c'
+@SUPPORT_BROTLI@     IMMUTABLE STRICT
+@SUPPORT_BROTLI@     PARALLEL SAFE;
+
+--
 -- Algorithm: gzip
 --
 

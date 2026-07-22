@@ -1,7 +1,6 @@
 
 #include "c.h"
 #include "pg_z.h"
-#include "utils/palloc.h"
 
 #include <zlib.h>
 
@@ -23,7 +22,14 @@ PG_FUNCTION_INFO_V1(pg_gunzip);
 static void *
 pg_zlib_alloc(void *opaque, unsigned int items, unsigned int size)
 {
-	return pg_hybrid_alloc((size_t)items * (size_t)size);
+	return palloc_extended((size_t)items * (size_t)size, MCXT_ALLOC_NO_OOM);
+}
+
+static void
+pg_zlib_free(void *opaque, void *address)
+{
+	if (address)
+		pfree(address);
 }
 
 /**
@@ -67,7 +73,7 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 
 	pg_mem_tracker_init();
 	zs.zalloc = pg_zlib_alloc;
-	zs.zfree = pg_hybrid_free;
+	zs.zfree = pg_zlib_free;
 	zs.opaque = Z_NULL;
 	zs.next_in = (Bytef *)in_data;
 	zs.avail_in = in_size;
@@ -88,7 +94,7 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 	allocated_size = (allocated_size + (memory_chunk_size - 1)) &
 					 ~(memory_chunk_size - 1);
 
-	out_buf = (uint8 *)pg_hybrid_alloc(allocated_size);
+	out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 	if (out_buf == NULL) {
 		deflateEnd(&zs);
 		elog(ERROR,
@@ -112,7 +118,7 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 			tmp_buf = (uint8 *)pg_hybrid_repalloc(
 					out_buf,
 					allocated_size - memory_chunk_size,
-					allocated_size);
+					&allocated_size);
 			if (tmp_buf == NULL) {
 				deflateEnd(&zs);
 				PG_FREE_IF_COPY(in_varlena, 0);
@@ -130,7 +136,6 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 
 	deflateEnd(&zs);
 	PG_FREE_IF_COPY(in_varlena, 0);
-	pg_mem_tracker_untrack(out_buf);
 
 	if (ret != Z_STREAM_END) {
 		elog(ERROR, "error during compression: %d", ret);
@@ -222,7 +227,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 
 	pg_mem_tracker_init();
 	zs.zalloc = pg_zlib_alloc;
-	zs.zfree = pg_hybrid_free;
+	zs.zfree = pg_zlib_free;
 	zs.opaque = Z_NULL;
 	zs.next_in = (Bytef *)in_data;
 	zs.avail_in = in_size;
@@ -237,7 +242,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 	allocated_size = (allocated_size + (memory_chunk_size - 1)) &
 					 ~(memory_chunk_size - 1);
 
-	out_buf = (uint8 *)palloc_extended(allocated_size, MCXT_ALLOC_NO_OOM);
+	out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 	if (out_buf == NULL) {
 		inflateEnd(&zs);
 		elog(ERROR,
@@ -269,7 +274,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 			tmp_buf = (uint8 *)pg_hybrid_repalloc(
 					out_buf,
 					allocated_size - memory_chunk_size,
-					allocated_size);
+					&allocated_size);
 			if (tmp_buf == NULL) {
 				inflateEnd(&zs);
 				PG_FREE_IF_COPY(in_varlena, 0);
@@ -287,7 +292,6 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 
 	inflateEnd(&zs);
 	PG_FREE_IF_COPY(in_varlena, 0);
-	pg_mem_tracker_untrack(out_buf);
 
 	if (ret != Z_STREAM_END)
 		elog(ERROR, "error during decompression: %d", ret);

@@ -1,0 +1,109 @@
+CREATE EXTENSION IF NOT EXISTS pg_z;
+-- brotli function tests
+SELECT brotli(NULL) AS brotli_null;
+ brotli_null 
+-------------
+ 
+(1 row)
+
+SELECT brotli('') AS brotli_blank;
+ brotli_blank 
+--------------
+ \x
+(1 row)
+
+SELECT brotli('\x00'::bytea) AS brotli_zero;
+  brotli_zero   
+----------------
+ \x010000040003
+(1 row)
+
+SELECT brotli('The quick brown fox jumps over the lazy dog') AS brotli_default;
+                                        brotli_default                                        
+----------------------------------------------------------------------------------------------
+ \x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801
+(1 row)
+
+SELECT brotli('The quick brown fox jumps over the lazy dog'::bytea) AS brotli_default;
+                                        brotli_default                                        
+----------------------------------------------------------------------------------------------
+ \x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801
+(1 row)
+
+SELECT brotli('The quick brown fox jumps over the lazy dog'::text) AS brotli_default;
+                                        brotli_default                                        
+----------------------------------------------------------------------------------------------
+ \x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801
+(1 row)
+
+SELECT brotli('The quick brown fox jumps over the lazy dog'::bytea, 8) AS brotli_8;
+                                            brotli_8                                            
+------------------------------------------------------------------------------------------------
+ \x8150010020e6364af56a58288a5391e764f2e728ba4055d94ab2c27ce18da723f2a2ac3626b8d50e8ca9ee3f0426
+(1 row)
+
+WITH str AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', 10000) AS str
+)
+SELECT convert_from(unbrotli(brotli(str)), 'utf8') = str AS unbrotli_long FROM str;
+ unbrotli_long 
+---------------
+ t
+(1 row)
+
+WITH strs AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', generate_series(1, 1000)) AS str
+)
+SELECT sum((str = convert_from(unbrotli(brotli(str)), 'utf8'))::integer) AS unbrotli_strings
+FROM strs;
+ unbrotli_strings 
+------------------
+             1000
+(1 row)
+
+-- incorrect compression_level (out of range 1..11) shouldn't cause an error
+SELECT brotli('The quick brown fox jumps over the lazy dog'::bytea, -100) AS brotli_err_1;
+ERROR:  Brotli compression level must be between 0 and 11
+SELECT brotli('The quick brown fox jumps over the lazy dog'::bytea, 100) AS brotli_err_2;
+ERROR:  Brotli compression level must be between 0 and 11
+-- unbrotli function tests
+SELECT convert_from(unbrotli(brotli('The quick brown fox jumps over the lazy dog')), 'utf8') AS unbrotli_ok;
+                 unbrotli_ok                 
+---------------------------------------------
+ The quick brown fox jumps over the lazy dog
+(1 row)
+
+SELECT unbrotli(''::bytea) AS unbrotli_blank;
+ unbrotli_blank 
+----------------
+ \x
+(1 row)
+
+SELECT unbrotli('\x00'::bytea) AS unbrotli_8;
+ERROR:  decompression error 2: corrupted stream or invalid data
+SELECT unbrotli('\x0000'::bytea) AS unbrotli_16;
+ERROR:  decompression error 2: corrupted stream or invalid data
+SELECT unbrotli('fubar'::bytea) AS unbrotli_16;
+ERROR:  decompression error 0: corrupted stream or invalid data
+SELECT unbrotli(brotli('\x00000000000000000000'::bytea)) AS brotli_roundtrip_zero;
+ brotli_roundtrip_zero  
+------------------------
+ \x00000000000000000000
+(1 row)
+
+SELECT unbrotli(brotli('The quick brown fox jumps over the lazy dog'::bytea, -100)) AS unbrotli_err_1;
+ERROR:  Brotli compression level must be between 0 and 11
+SELECT unbrotli(brotli('The quick brown fox jumps over the lazy dog'::bytea, 100)) AS unbrotli_err_2;
+ERROR:  Brotli compression level must be between 0 and 11
+-- check limit set by DB parameter
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = 1000;
+SELECT unbrotli(brotli(repeat('?', 1100)::bytea)) AS unbrotli_overlimit;
+ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+RESET pg_z.max_size;
+DROP EXTENSION pg_z;

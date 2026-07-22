@@ -2,42 +2,50 @@
 
 <!-- toc -->
 
+- [Brotli Algorithms](#brotli-algorithms)
+    * [`brotli`](#brotli)
+        + [`brotli` Description](#brotli-description)
+        + [`brotli` Usage Notes](#brotli-usage-notes)
+        + [`brotli` Examples](#brotli-examples)
+    * [`unbrotli`](#unbrotli)
+        + [`unbrotli` Usage Notes](#unbrotli-usage-notes)
+        + [`unbrotli` Examples](#unbrotli-examples)
 - [Gzip and Deflate Algorithms (zlib)](#gzip-and-deflate-algorithms-zlib)
     * [`deflate`](#deflate)
-        + [Description](#description)
-        + [Usage Notes](#usage-notes)
-        + [Examples](#examples)
+        + [`deflate` Description](#deflate-description)
+        + [`deflate` Usage Notes](#deflate-usage-notes)
+        + [`deflate` Examples](#deflate-examples)
     * [`inflate`](#inflate)
-        + [Description](#description-1)
-        + [Usage Notes](#usage-notes-1)
-        + [Examples](#examples-1)
+        + [`inflate` Description](#inflate-description)
+        + [`inflate` Usage Notes](#inflate-usage-notes)
+        + [`inflate` Examples](#inflate-examples)
     * [`gzip`](#gzip)
-        + [Description](#description-2)
-        + [Usage Notes](#usage-notes-2)
-        + [Examples](#examples-2)
-    * [`gunzip`](#gunzip)
-        + [Description](#description-3)
-        + [Usage Notes](#usage-notes-3)
-        + [Examples](#examples-3)
+        + [`gzip` Description](#gzip-description)
+        + [`gzip` Usage Notes](#gzip-usage-notes)
+        + [`gzip` Examples](#gzip-examples)
+    * [`gunzip` (aka `ungzip`)](#gunzip-aka-ungzip)
+        + [`gunzip` Description](#gunzip-description)
+        + [`gunzip` Usage Notes](#gunzip-usage-notes)
+        + [`gunzip` Examples](#gunzip-examples)
 - [LZ4 Algorithm](#lz4-algorithm)
     * [`lz4`](#lz4)
-        + [Description](#description-4)
-        + [Usage Notes](#usage-notes-4)
-        + [Examples](#examples-4)
+        + [`lz4` Description](#lz4-description)
+        + [`lz4` Usage Notes](#lz4-usage-notes)
+        + [`lz4` Examples](#lz4-examples)
     * [`unlz4`](#unlz4)
-        + [Description](#description-5)
-        + [Usage Notes](#usage-notes-5)
-        + [Examples](#examples-5)
+        + [`unlz4` Description](#unlz4-description)
+        + [`unlz4` Usage Notes](#unlz4-usage-notes)
+        + [Examples](#examples)
 - [Zstandard Algorithm (zstd)](#zstandard-algorithm-zstd)
-    * [Important Execution Safety Note](#important-execution-safety-note)
+    * [Zstandard Important Execution Safety Note](#zstandard-important-execution-safety-note)
     * [`zstd`](#zstd)
-        + [Description](#description-6)
-        + [Usage Notes](#usage-notes-6)
-        + [Examples](#examples-6)
+        + [`zstd` Description](#zstd-description)
+        + [`zstd` Usage Notes](#zstd-usage-notes)
+        + [`zstd` Examples](#zstd-examples)
     * [`unzstd`](#unzstd)
-        + [Description](#description-7)
-        + [Usage Notes](#usage-notes-7)
-        + [Examples](#examples-7)
+        + [`unzstd` Description](#unzstd-description)
+        + [`unzstd` Usage Notes](#unzstd-usage-notes)
+        + [`unzstd` Examples](#unzstd-examples)
 
 <!-- tocstop -->
 
@@ -49,6 +57,69 @@ Compression functions accept both `bytea` and `text` data types. Decompression
 functions strictly take `bytea` inputs and return the raw decompressed `bytea`
 stream.
 
+## Brotli Algorithms
+
+The Brotli compression algorithm (RFC 7932) is highly optimized for text data,
+web content, and JSON payloads. It provides exceptional compression ratios,
+outperforming Gzip and often matching or exceeding Zstandard on highly
+repetitive string patterns.
+
+All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
+
+### `brotli`
+
+brotli ( uncompressed bytea \[, compression_level integer \] ) → bytea
+
+brotli ( uncompressed text \[, compression_level integer \] ) → bytea
+
+#### `brotli` Description
+
+Compresses input raw bytes (`bytea`) or text (`text`) using the Brotli
+algorithm with a specified compression quality level.
+
+#### `brotli` Usage Notes
+
+The optional `compression_level` parameter must be an integer within the range
+of **`0` to `11`**, with `3` selected as the default value.
+
+- `0–3`: Provides the fastest compression levels (good for real-time transmission
+where server CPU is heavily constrained).
+- `4–6`: Provides a balance between speed and ratio (good for on-the-fly
+compression, recommended for general use).
+- `7–9`: Provides a high level of compression (good for on-the-fly compression if
+build time is a concern).
+- `10–11`: Provides maximum compression (ideal for pre-compressing static assets
+like HTML, CSS, and JS).
+
+#### `brotli` Examples
+
+```sql
+SELECT brotli('hello world');
+-- Result: \x0128000468656c6c6f20776f726c6403
+
+SELECT brotli('compress me'::bytea, 9);
+-- Result: \x01280004636f6d7072657373206d6503
+```
+
+***
+
+### `unbrotli`
+
+unbrotli ( compressed bytea ) → bytea
+
+#### `unbrotli` Usage Notes
+
+Decompresses a Brotli-compressed binary stream back into its original raw bytes
+layout.
+
+#### `unbrotli` Examples
+
+```sql
+SELECT convert_from(unbrotli(brotli('hello world')), 'UTF8');
+-- Result: hello world
+```
+
+***
 
 ## Gzip and Deflate Algorithms (zlib)
 
@@ -64,23 +135,24 @@ deflate ( uncompressed bytea \[, compression_level integer \] ) → bytea
 
 deflate ( uncompressed text \[, compression_level integer \] ) → bytea
 
-#### Description
+#### `deflate` Description
 
 Compresses the input data using the raw zlib deflate format specified in
 RFC 1951.
 
-#### Usage Notes
+#### `deflate` Usage Notes
 
 The optional `compression_level` parameter must be an integer within the range
 of **`-1` to `9`**.
-* `-1` utilizes the default compression level balanced between speed and size
+
+- `-1` utilizes the default compression level balanced between speed and size
 (typically equivalent to level 6).
-* `0` provides no compression (data is only stored).
-* `1` provides the fastest compression speed.
-* `9` provides the maximum compression ratio at the cost of execution time and
+- `0` provides no compression (data is only stored).
+- `1` provides the fastest compression speed.
+- `9` provides the maximum compression ratio at the cost of execution time and
 higher CPU usage.
 
-#### Examples
+#### `deflate` Examples
 
 ```sql
 SELECT deflate('hello world');
@@ -96,18 +168,18 @@ SELECT deflate('compress me'::bytea, 9);
 
 inflate ( compressed bytea ) → bytea
 
-#### Description
+#### `inflate` Description
 
 Decompresses a raw deflate byte stream complying with RFC 1951 back into its
 original binary layout.
 
-#### Usage Notes
+#### `inflate` Usage Notes
 
 This function will fail with an error if the input byte sequence is corrupted
 or is not a valid raw deflate stream. It cannot parse streams wrapped with gzip
 headers.
 
-#### Examples
+#### `inflate` Examples
 
 ```sql
 SELECT convert_from(inflate(deflate('hello world')), 'UTF8');
@@ -122,12 +194,12 @@ gzip ( uncompressed bytea \[, compression_level integer \] ) → bytea
 
 gzip ( uncompressed text \[, compression_level integer \] ) → bytea
 
-#### Description
+#### `gzip` Description
 
 Compresses the input data and wraps it using the standard gzip file format
 layout specified in RFC 1952.
 
-#### Usage Notes
+#### `gzip` Usage Notes
 
 The optional `compression_level` parameter accepts integers within the range of
 **`-1` to `9`**, defaulting to `-1`. The gzip format includes a header that
@@ -135,7 +207,7 @@ makes the output slightly larger than raw deflate for small inputs, but the
 resulting binary data is fully compatible with external tools like the
 command-line `gunzip` utility.
 
-#### Examples
+#### `gzip` Examples
 
 ```sql
 SELECT gzip('hello world'::bytea, 9);
@@ -148,7 +220,7 @@ SELECT gzip('hello world'::bytea, 9);
 
 gunzip ( compressed bytea ) → bytea
 
-#### Description
+#### `gunzip` Description
 
 Decompresses a gzip-wrapped byte stream complying with RFC 1952 back into its
 original binary layout.
@@ -156,22 +228,20 @@ original binary layout.
 `ungzip` is just a synonym for `gunzip` to keep the "un" prefix in front of
 the algorithm's name, maintaining consistency with other cases.
 
-
-#### Usage Notes
+#### `gunzip` Usage Notes
 
 The input must be a valid gzip binary payload starting with the appropriate
 magic bytes (`\x1f8b`). Attempting to pass a raw deflate stream or any other
 compression format will result in a runtime evaluation error.
 
-#### Examples
+#### `gunzip` Examples
 
 ```sql
 SELECT convert_from(gunzip(gzip('hello world')), 'UTF8');
 -- Result: hello world
 ```
 
----
-
+***
 
 ## LZ4 Algorithm
 
@@ -188,21 +258,22 @@ lz4 ( uncompressed bytea \[, compression_level integer \] ) → bytea
 
 lz4 ( uncompressed text \[, compression_level integer \] ) → bytea
 
-#### Description
+#### `lz4` Description
 
 Compresses the input data using the high-speed LZ4 algorithm framework.
 
-#### Usage Notes
+#### `lz4` Usage Notes
 
 The optional `compression_level` parameter accepts integers within the range of
 **`0` to `16`** (with standard implementations supporting up to level 12 or 16
 depending on the underlying `liblz4` high-compression variants).
-* The default value is `5`.
-* Higher values enable the HC (High Compression) mode, which improves the
+
+- The default value is `5`.
+- Higher values enable the HC (High Compression) mode, which improves the
 compression ratio but significantly increases compression time. Decompression
 speed remains uniformly fast regardless of the compression level.
 
-#### Examples
+#### `lz4` Examples
 
 ```sql
 SELECT lz4('hello world');
@@ -215,12 +286,12 @@ SELECT lz4('hello world');
 
 unlz4 ( compressed bytea ) → bytea
 
-#### Description
+#### `unlz4` Description
 
 Decompresses an LZ4 compressed byte stream back into its original binary layout
 according to RFC 8478.
 
-#### Usage Notes
+#### `unlz4` Usage Notes
 
 Input sequences must represent valid payloads compressed strictly via the
 matching `lz4()` implementation functions.
@@ -232,14 +303,14 @@ SELECT convert_from(unlz4(lz4('hello world')), 'UTF8');
 -- Result: hello world
 ```
 
----
+***
 
 ## Zstandard Algorithm (zstd)
 
 Zstandard provides real-time compression scenarios with scaling ratios
 comparable to the best archive formats, natively specified in RFC 8878.
 
-### Important Execution Safety Note
+### Zstandard Important Execution Safety Note
 
 Unlike the previous algorithms, the `zstd` and `unzstd` functions are explicitly
 designated as **`PARALLEL UNSAFE`**. The underlying C implementation natively
@@ -254,21 +325,21 @@ zstd ( uncompressed bytea \[, compression_level integer \[, threads integer \] \
 
 zstd ( uncompressed text \[, compression_level integer \[, threads integer \] \] ) → bytea
 
-#### Description
+#### `zstd` Description
 
 Compresses the input data using the Zstandard (zstd) algorithm wrapper framework.
 
-#### Usage Notes
+#### `zstd` Usage Notes
 
-* The optional `compression_level` parameter accepts integers within the range of
+- The optional `compression_level` parameter accepts integers within the range of
 **`1` to `22`** (with standard levels going up to 19, and levels 20-22 acting
 as ultra-high memory modes). It defaults to `7`.
-* The optional `threads` parameter sets the number of concurrent worker threads
+- The optional `threads` parameter sets the number of concurrent worker threads
 spawned internally by the `zstd` engine to process the specific chunk,
 defaulting to `1`. Setting `threads > 1` can significantly reduce compression
 times for large text or binary payloads.
 
-#### Examples
+#### `zstd` Examples
 
 ```sql
 SELECT zstd('hello world', 7, 2);
@@ -281,21 +352,20 @@ SELECT zstd('hello world', 7, 2);
 
 unzstd ( compressed bytea ) → bytea
 
-#### Description
+#### `unzstd` Description
 
 Decompresses a Zstandard compressed byte stream complying with RFC 8878 back
 into its original binary layout.
 
-#### Usage Notes
+#### `unzstd` Usage Notes
 
 The function evaluates the incoming binary blocks. If structural blocks or
 checksum bounds do not match valid Zstandard specifications, execution is
 terminated with an explicit engine error.
 
-#### Examples
+#### `unzstd` Examples
 
 ```sql
 SELECT convert_from(unzstd(zstd('zstd multi-threaded output', 12, 4)), 'UTF8');
 -- Result: zstd multi-threaded output
 ```
-

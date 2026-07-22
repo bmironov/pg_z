@@ -56,10 +56,18 @@ void pg_mem_tracker_untrack(void *address);
 /* Global variable to store the actual default Huge Page size of the OS */
 extern size_t huge_page_size;
 
-void *pg_hybrid_alloc(size_t size);
-void *pg_hybrid_repalloc(void *address, size_t prev_size, size_t new_size);
+void *pg_hybrid_alloc(size_t *size);
+void *pg_hybrid_repalloc(void *address, size_t prev_size, size_t *new_size);
 void pg_hybrid_free(void *opaque, void *address);
 
+/*
+ * ===============================================================
+ * brotli-related variables and functions
+ * ===============================================================
+ */
+
+Datum pg_brotli(PG_FUNCTION_ARGS);
+Datum pg_unbrotli(PG_FUNCTION_ARGS);
 /*
  * ===============================================================
  * gzip-related variables and functions
@@ -88,5 +96,10 @@ Datum pg_unlz4(PG_FUNCTION_ARGS);
 
 Datum pg_zstd(PG_FUNCTION_ARGS);
 Datum pg_unzstd(PG_FUNCTION_ARGS);
+
+/*
+ * Global functions
+ */
+void dump_hex(const char *label, const uint8 *data, size_t size);
 
 #endif

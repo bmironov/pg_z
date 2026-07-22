@@ -29,7 +29,7 @@ CREATE TABLE pg_z_tests (
 DO $$
 DECLARE
     v_algo TEXT;
-    v_list TEXT[] := ARRAY['deflate', 'gzip', 'lz4', 'zstd'];
+    v_list TEXT[] := ARRAY['brotli', 'deflate', 'gzip', 'lz4', 'zstd', 'zstd-mt'];
 BEGIN
     FOREACH v_algo IN ARRAY v_list LOOP
         -- Case 1: Small payload (frequently handles inline raw text, under 2KB)
@@ -49,7 +49,15 @@ BEGIN
         INSERT INTO pg_z_tests (algorithm, test_case_name, original_text)
         VALUES (v_algo,
                 'Large Payload (Heavy Structural Block) [~1500kB]',
-                repeat('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ' || chr(10), 12000));
+                repeat('Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
+                    || 'Maecenas metus eros, lobortis quis tortor sed, luctus blandit felis. '
+                    || 'In ultricies condimentum magna sed iaculis. '
+                    || 'Maecenas nisi erat, molestie eu velit eget, pellentesque auctor elit. '
+                    || 'Nulla sit amet ligula mi. Integer vitae vestibulum orci. '
+                    || 'Vestibulum sit amet iaculis turpis. Proin interdum posuere nunc vel dictum. '
+                    || 'Sed quis rutrum ipsum.'
+                    || chr(10), 4000)
+                );
     END LOOP;
 END $$;
 
@@ -58,6 +66,12 @@ END $$;
 -- =====================================================================
 \echo 'Executing pg_Z tests...';
 
+
+UPDATE pg_z_tests
+SET
+    compressed_payload = brotli(original_text, 5),
+    decompressed_text = convert_from(unbrotli(brotli(original_text, 5)), 'UTF8')
+WHERE algorithm = 'brotli';
 
 UPDATE pg_z_tests
 SET
@@ -77,12 +91,18 @@ SET
     decompressed_text = convert_from(unlz4(lz4(original_text, 5)), 'UTF8')
 WHERE algorithm = 'lz4';
 
+UPDATE pg_z_tests
+SET
+    compressed_payload = zstd(original_text, 5, 1),
+    decompressed_text = convert_from(unzstd(zstd(original_text, 5, 1)), 'UTF8')
+WHERE algorithm = 'zstd';
+
 -- Compress using level 5 with 4 worker threads
 UPDATE pg_z_tests
 SET
     compressed_payload = zstd(original_text, 5, 4),
     decompressed_text = convert_from(unzstd(zstd(original_text, 5, 4)), 'UTF8')
-WHERE algorithm = 'zstd';
+WHERE algorithm = 'zstd-mt';
 
 -- =====================================================================
 -- Computing metrics and validating bit-by-bit accuracy

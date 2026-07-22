@@ -88,7 +88,8 @@ pg_zstd(PG_FUNCTION_ARGS)
 	}
 
 	// Allocate space for the PostgreSQL bytea output structure
-	out_buf = (uint8 *)pg_hybrid_alloc(max_dst_size + VARHDRSZ);
+	max_dst_size += VARHDRSZ;
+	out_buf = (uint8 *)pg_hybrid_alloc(&max_dst_size);
 	if (out_buf == NULL) {
 		ZSTD_freeCCtx(cctx); // Free context to prevent memory leak
 		PG_FREE_IF_COPY(in_varlena, 0);
@@ -108,7 +109,6 @@ pg_zstd(PG_FUNCTION_ARGS)
 			cctx, dst_buf, max_dst_size, in_data, in_size, compression_level);
 	ZSTD_freeCCtx(cctx);
 	PG_FREE_IF_COPY(in_varlena, 0);
-	pg_mem_tracker_untrack(out_buf);
 
 	// Check for runtime errors
 	if (ZSTD_isError(comp_size))
@@ -143,8 +143,7 @@ pg_unzstd(PG_FUNCTION_ARGS)
 			.opaque = (void *)CurrentMemoryContext};
 
 	// Find out the original uncompressed frame size
-	unsigned long long const uncompressed_size =
-			ZSTD_getFrameContentSize(in_data, in_size);
+	size_t uncompressed_size = ZSTD_getFrameContentSize(in_data, in_size);
 
 	if (in_size == 0) {
 		PG_RETURN_BYTEA_P(in_varlena);
@@ -169,7 +168,8 @@ pg_unzstd(PG_FUNCTION_ARGS)
 	}
 
 	// Allocate memory for uncompressed result
-	out_buf = (uint8 *)pg_hybrid_alloc((size_t)uncompressed_size + VARHDRSZ);
+	uncompressed_size += VARHDRSZ;
+	out_buf = (uint8 *)pg_hybrid_alloc(&uncompressed_size);
 	if (out_buf == NULL) {
 		ZSTD_freeDCtx(dctx); // Safely frees through pg_zstd_free wrapper
 		PG_FREE_IF_COPY(in_varlena, 0);
@@ -185,7 +185,6 @@ pg_unzstd(PG_FUNCTION_ARGS)
 
 	ZSTD_freeDCtx(dctx);
 	PG_FREE_IF_COPY(in_varlena, 0);
-	pg_mem_tracker_untrack(out_buf);
 
 	if (max_uncompressed_size >= 0 && uncomp_size > max_uncompressed_size)
 		elog(ERROR,

@@ -20,30 +20,39 @@ AC_DEFUN([AC_CHECK_REQUIRED_LIB], [
 ])
 
 # Call the macro for each required library
+AC_CHECK_REQUIRED_LIB([brotlicommon], [BrotliSharedDictionaryCreateInstance], [libbrotli])
+AC_CHECK_REQUIRED_LIB([brotlienc], [BrotliEncoderCreateInstance], [libbrotli])
+AC_CHECK_REQUIRED_LIB([brotlidec], [BrotliDecoderCreateInstance], [libbrotli])
 AC_CHECK_REQUIRED_LIB([z], [deflate], [zlib])
 AC_CHECK_REQUIRED_LIB([lz4], [LZ4_compress_default], [liblz4])
 AC_CHECK_REQUIRED_LIB([zstd], [ZSTD_compress], [libzstd])
 
 
+SUPPORT_BROTLI="-- "
 SUPPORT_ZLIB="-- "
 SUPPORT_LZ4="-- "
 SUPPORT_ZSTD="-- "
 
 case "$DYNAMIC_LIBS" in
-    *-lz*)    SUPPORT_ZLIB="" ;;
+    *-lbrotli*) SUPPORT_BROTLI="" ;;
 esac
 
 case "$DYNAMIC_LIBS" in
-    *-llz4*)  SUPPORT_LZ4="" ;;
+    *-lz*)      SUPPORT_ZLIB="" ;;
 esac
 
 case "$DYNAMIC_LIBS" in
-    *-lzstd*) SUPPORT_ZSTD="" ;;
+    *-llz4*)    SUPPORT_LZ4="" ;;
+esac
+
+case "$DYNAMIC_LIBS" in
+    *-lzstd*)   SUPPORT_ZSTD="" ;;
 esac
 
 
 # Export results to Makefile.port
 AC_SUBST(DYNAMIC_LIBS)
+AC_SUBST(SUPPORT_BROTLI)
 AC_SUBST(SUPPORT_ZLIB)
 AC_SUBST(SUPPORT_LZ4)
 AC_SUBST(SUPPORT_ZSTD)

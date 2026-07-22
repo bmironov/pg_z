@@ -22,6 +22,8 @@ static int tracked_pages_count = 0;
 
 size_t huge_page_size;
 
+static MemoryContextCallback registry_cleanup_callback;
+static MemoryContext last_registered_context = NULL;
 /*
  * ===========================================================
  * Memory region tracker (maintains registry of mem regions)
@@ -60,7 +62,7 @@ pg_mem_tracker_init_hugepage_size(void)
  * Automatic PostgreSQL Context Callback.
  */
 static void
-pg_mem_tracker_cleanup_callback(void *arg)
+pg_mem_tracker_cleanup(void *arg)
 {
 	registry_index i;
 
@@ -74,6 +76,7 @@ pg_mem_tracker_cleanup_callback(void *arg)
 	}
 
 	tracked_pages_count = 0;
+	last_registered_context = NULL;
 }
 
 // Initialize registry
@@ -98,7 +101,7 @@ pg_mem_tracker_init(void)
 	// Attach to Postgres callback to release all allocated memory after TXN
 	dynamic_cb =
 			(MemoryContextCallback *)palloc(sizeof(MemoryContextCallback));
-	dynamic_cb->func = pg_mem_tracker_cleanup_callback;
+	dynamic_cb->func = pg_mem_tracker_cleanup;
 	dynamic_cb->arg = NULL;
 
 	MemoryContextRegisterResetCallback(CurrentMemoryContext, dynamic_cb);
@@ -114,6 +117,7 @@ pg_mem_tracker_find_index(void *address)
 		if (page_registry[i].address == address)
 			return i;
 	}
+
 	return -1;
 }
 
@@ -121,10 +125,27 @@ pg_mem_tracker_find_index(void *address)
 static void
 pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 {
-	if (tracked_pages_count >= MAX_TRACKED_PAGES)
-		elog(ERROR,
-			 "Memory regions registry overflow."
-			 " Too many allocations in a single query.");
+	registry_index i, j = 0;
+
+	// Lazy cleanup of non Huge Pages is possible,
+	// as they will be released by PostgreSQL automatically
+	if (tracked_pages_count >= MAX_TRACKED_PAGES) {
+		for (i = 0; i < tracked_pages_count; i++) {
+			if (page_registry[i].is_huge) {
+				if (i != j) {
+					page_registry[j] = page_registry[i];
+				}
+				j++;
+			}
+		}
+		tracked_pages_count = j;
+
+		if (tracked_pages_count >= MAX_TRACKED_PAGES)
+			elog(ERROR,
+				 "Memory regions registry overflow."
+				 " Too many allocations in a single query (%d).",
+				 tracked_pages_count);
+	}
 
 	page_registry[tracked_pages_count].address = address;
 	page_registry[tracked_pages_count].region_size = size;
@@ -138,9 +159,13 @@ pg_mem_tracker_unregister(registry_index index)
 {
 	registry_index i;
 
+	if (index < 0 || index > tracked_pages_count)
+		return;
+
 	for (i = index; i < tracked_pages_count; i++) {
 		page_registry[i] = page_registry[i + 1];
 	}
+
 	tracked_pages_count--;
 	page_registry[tracked_pages_count].address = NULL;
 	page_registry[tracked_pages_count].region_size = 0;
@@ -159,7 +184,7 @@ pg_mem_tracker_unregister(registry_index index)
 void
 pg_mem_tracker_untrack(void *address)
 {
-	registry_index i, idx;
+	registry_index i, idx = -1;
 	size_t final_size = 0;
 	bool is_huge = false;
 
@@ -216,19 +241,30 @@ pg_mem_tracker_untrack(void *address)
  * palloc calls do not register in tracker
  */
 void *
-pg_hybrid_alloc(size_t size)
+pg_hybrid_alloc(size_t *size)
 {
-	void *ptr;
+	void *ptr = NULL;
 	size_t huge_size; // separate size rounded up to Huge Page size
+	size_t req_size = *size;
 
-	if (size > memory_chunk_size) {
+	if (req_size > memory_chunk_size) {
 		// rounding up size to closest memory_chunk_size multiple
-		size = (size + (memory_chunk_size - 1)) & ~(memory_chunk_size - 1);
+		req_size = (req_size + (memory_chunk_size - 1)) &
+				   ~(memory_chunk_size - 1);
 	}
 
-	if (size >= huge_page_size) {
+	if (CurrentMemoryContext != last_registered_context) {
+		registry_cleanup_callback.func = pg_mem_tracker_cleanup;
+		registry_cleanup_callback.arg = NULL;
+
+		MemoryContextRegisterResetCallback(
+				CurrentMemoryContext, &registry_cleanup_callback);
+		last_registered_context = CurrentMemoryContext;
+	}
+
+	if (req_size >= huge_page_size) {
 		// Round up size to closest Huge Page size multiple
-		huge_size = (size + (huge_page_size - 1)) & ~(huge_page_size - 1);
+		huge_size = (req_size + (huge_page_size - 1)) & ~(huge_page_size - 1);
 		ptr =
 				mmap(NULL,
 					 huge_size,
@@ -238,17 +274,19 @@ pg_hybrid_alloc(size_t size)
 					 0);
 
 		if (ptr != MAP_FAILED) {
+			*size = huge_size;
 			pg_mem_tracker_register(ptr, huge_size, true);
 			return ptr;
 		}
 	}
 
-	ptr = palloc_extended(size, MCXT_ALLOC_NO_OOM);
+	ptr = palloc_extended(req_size, MCXT_ALLOC_NO_OOM);
 	if (ptr == NULL)
 		return NULL;
 
-	if (size >= memory_chunk_size) // Don't track small allocations
-		pg_mem_tracker_register(ptr, size, false);
+	*size = req_size;
+	pg_mem_tracker_register(ptr, req_size, false);
+
 	return ptr;
 }
 
@@ -256,20 +294,23 @@ pg_hybrid_alloc(size_t size)
  * pg_hybrid_repalloc reallocates memory based on HugePageHeader struct
  */
 void *
-pg_hybrid_repalloc(void *address, size_t prev_size, size_t new_size)
+pg_hybrid_repalloc(void *address, size_t prev_size, size_t *new_size)
 {
-	void *new_address;
-	registry_index old_idx;
-	size_t old_size;
-	bool old_is_huge;
+	void *new_address = NULL;
+	registry_index old_idx = -1;
+	bool old_is_huge = false;
+	size_t old_size = 0, req_size = *new_size;
 
 	if (address == NULL)
 		return pg_hybrid_alloc(new_size);
 
 	old_idx = pg_mem_tracker_find_index(address);
 	if (old_idx < 0) {
-		if (new_size < memory_chunk_size)
-			return repalloc(address, new_size);
+		if (req_size < memory_chunk_size) {
+			new_address = repalloc(address, req_size);
+			*new_size = req_size;
+			return new_address;
+		}
 
 		old_size = prev_size;
 		old_is_huge = false;
@@ -277,15 +318,18 @@ pg_hybrid_repalloc(void *address, size_t prev_size, size_t new_size)
 		old_size = page_registry[old_idx].region_size;
 		old_is_huge = page_registry[old_idx].is_huge;
 
-		if (new_size <= old_size)
+		if (req_size <= old_size) {
+			*new_size = old_size;
 			return address;
+		}
 	}
 
 	new_address = pg_hybrid_alloc(new_size);
 	if (new_address == NULL)
 		return NULL;
 
-	memcpy(new_address, address, (old_size < new_size) ? old_size : new_size);
+	memcpy(new_address, address, old_size);
+
 	if (old_is_huge)
 		munmap(address, old_size);
 	else

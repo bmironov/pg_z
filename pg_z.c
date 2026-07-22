@@ -74,3 +74,34 @@ _PG_init(void)
 
 	pg_mem_tracker_init_hugepage_size();
 }
+
+void
+dump_hex(const char *label, const uint8 *data, size_t size)
+{
+	char *hex_dump;
+	size_t dump_bytes;
+	size_t i;
+	static const char hex_chars[] = "0123456789abcdef";
+
+	if (size == 0) {
+		elog(NOTICE, "Data dump '%s' is empty (size 0)", label);
+		return;
+	}
+
+	dump_bytes = (size > 128) ? 128 : size;
+	hex_dump = (char *)palloc(dump_bytes * 2 + 1);
+
+	for (i = 0; i < dump_bytes; i++) {
+		hex_dump[i * 2] = hex_chars[(data[i] >> 4) & 0x0F];
+		hex_dump[i * 2 + 1] = hex_chars[data[i] & 0x0F];
+	}
+	hex_dump[dump_bytes * 2] = '\0';
+
+	elog(NOTICE,
+		 "Data dump '%s': Total size: %zu. First %zu bytes: %s",
+		 label,
+		 size,
+		 dump_bytes,
+		 hex_dump);
+	pfree(hex_dump);
+}

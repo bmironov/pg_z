@@ -7,6 +7,7 @@
     * [`pg_z.max_size`](#pg_zmax_size)
     * [`pg_z.mem_chunk_size`](#pg_zmem_chunk_size)
 - [Functions Provided by This Extension](#functions-provided-by-this-extension)
+- [Data-Flow with `pg_z`](#data-flow-with-pg_z)
 - [Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`](#usage-of-postgresql-v18-ability-to-install-extensions-without-sudo)
 - [Compiling the Extension with Debug Information](#compiling-the-extension-with-debug-information)
 - [Supplied Unit Tests for `pg_z` Functions](#supplied-unit-tests-for-pg_z-functions)
@@ -36,9 +37,10 @@ at the cost of slightly higher CPU usage during compression.
 
 ## Requirements for the `pg_z` Extension
 
-The `pg_z` extension requires three libraries and their development headers to
-be installed on the system to compile into a `.so` file:
+The `pg_z` extension requires several libraries and their development headers
+to be installed on the system to compile into a `.so` file:
 
+- `brotli` (to support `brotli`);
 - `zlib` (to support the `gzip` and `deflate` algorithms);
 - `lz4` (to support `LZ4`);
 - `zstd` (to support `Zstandard`).
@@ -111,6 +113,9 @@ The `pg_z` extension provides several functions for working with compressed
 data. These functions are categorized into groups based on their underlying
 compression algorithms:
 
+- brotli
+  - brotli
+  - unbrotli
 - gzip
   - gzip
   - gunzip (aka ungzip)
@@ -126,6 +131,12 @@ compression algorithms:
 
 Detailed definitions and usage examples for these functions can be found in
 [USAGE.md][4].
+
+## Data-Flow with `pg_z`
+
+The documentation in [DATA_FLOW.md][5] outlines the data flow and database
+environment necessary for processing large documents. It provides both a visual
+diagram and a configuration example to support this functionality.
 
 ## Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`
 
@@ -192,13 +203,14 @@ In case of successful unit test run, output should look similar this:
 ```
 # +++ regress install-check in  +++
 # using postmaster on Unix socket, default port
-ok 1         - gzip                                       73 ms
-ok 2         - deflate                                    57 ms
-ok 3         - lz4                                        26 ms
-ok 4         - zstd                                       33 ms
-ok 5         - db_params                                   9 ms
-1..5
-# All 5 tests passed
+ok 1         - brotli                                     45 ms
+ok 2         - gzip                                       66 ms
+ok 3         - deflate                                    62 ms
+ok 4         - lz4                                        25 ms
+ok 5         - zstd                                       36 ms
+ok 6         - db_params                                  11 ms
+1..6
+# All 6 tests passed.
 ```
 
 Since the tests are similar in nature, the difference in execution time between
@@ -304,3 +316,4 @@ a universal reference to compression as in `.Z` file type.
 [2]: https://cloudnative-pg.io/
 [3]: https://www.postgresql.org/docs/current/extend-pgxs.html
 [4]: USAGE.md
+[5]: DATA_FLOW.md

@@ -5,13 +5,9 @@ FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    autoconf \
-    automake \
-    zlib1g-dev \
-    liblz4-dev \
-    libzstd-dev \
-    wget \
-    ca-certificates \
+    autoconf automake \
+    zlib1g-dev liblz4-dev libzstd-dev libbrotli-dev \
+    wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PostgreSQL 18 development files from PGDG repository
@@ -33,13 +29,14 @@ FROM scratch
 
 # Structure strictly separated for the pg_z extension
 # Copy extension manifests and the compiled .so
-COPY --from=builder /build/pg_z.control /extensions/pg_z/
+COPY --from=builder /build/pg_z.control  /extensions/pg_z/
 COPY --from=builder /build/pg_z--1.0.sql /extensions/pg_z/
-COPY --from=builder /build/tmp/pg_z.so     /extensions/pg_z/
+COPY --from=builder /build/tmp/pg_z.so   /extensions/pg_z/
 
 # Copy the EXACT dynamic library .so dependencies discovered by the builder
 # This isolates zlib, lz4, and zstd from the base OS inside this image volume
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libz.so*    /extensions/pg_z/system/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/liblz4.so*  /extensions/pg_z/system/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libzstd.so* /extensions/pg_z/system/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libz.so*       /extensions/pg_z/system/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/liblz4.so*     /extensions/pg_z/system/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libzstd.so*    /extensions/pg_z/system/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libbrotli*.so* /extensions/pg_z/system/
 

@@ -3,9 +3,9 @@ DATA = pg_z--1.0.sql
 MODULE_big = pg_z
 
 BUILD_DIR = tmp
-SRC_MODULES = pg_z mem_manager gzip lz4 zstd
+SRC_MODULES = pg_z mem_manager brotli gzip lz4 zstd
 
-REGRESS = gzip deflate lz4 zstd db_params
+REGRESS = brotli gzip deflate lz4 zstd db_params
 
 
 ifeq ($(filter $(BUILD_DIR),$(notdir $(CURDIR))),)
