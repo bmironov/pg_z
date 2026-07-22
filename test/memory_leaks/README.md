@@ -22,7 +22,7 @@ valgrind --show-error-list=yes \
          --track-origins=yes \
          --trace-children=yes \
          --trace-syscalls=yes \
-         --suppressions=pg_z.supp \
+         --suppressions=./test/memory_leaks/pg_z.supp \
          --log-file=/tmp/pg_z_leak.log \
          postgres -D /var/lib/postgresql/18/main \
          -c config_file=/etc/postgresql/18/main/postgresql.conf

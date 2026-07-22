@@ -35,7 +35,7 @@
     * [`unlz4`](#unlz4)
         + [`unlz4` Description](#unlz4-description)
         + [`unlz4` Usage Notes](#unlz4-usage-notes)
-        + [Examples](#examples)
+        + [`unlz4` Examples](#unlz4-examples)
 - [Zstandard Algorithm (zstd)](#zstandard-algorithm-zstd)
     * [Zstandard Important Execution Safety Note](#zstandard-important-execution-safety-note)
     * [`zstd`](#zstd)
@@ -68,9 +68,11 @@ All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
 
 ### `brotli`
 
-brotli ( uncompressed bytea \[, compression_level integer \] ) → bytea
+```text
+brotli ( uncompressed bytea [, compression_level integer ] ) → bytea
 
-brotli ( uncompressed text \[, compression_level integer \] ) → bytea
+brotli ( uncompressed text [, compression_level integer ] ) → bytea
+```
 
 #### `brotli` Description
 
@@ -105,7 +107,9 @@ SELECT brotli('compress me'::bytea, 9);
 
 ### `unbrotli`
 
+```text
 unbrotli ( compressed bytea ) → bytea
+```
 
 #### `unbrotli` Usage Notes
 
@@ -131,9 +135,11 @@ All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
 
 ### `deflate`
 
-deflate ( uncompressed bytea \[, compression_level integer \] ) → bytea
+```text
+deflate ( uncompressed bytea [, compression_level integer ] ) → bytea
 
-deflate ( uncompressed text \[, compression_level integer \] ) → bytea
+deflate ( uncompressed text [, compression_level integer ] ) → bytea
+```
 
 #### `deflate` Description
 
@@ -166,7 +172,9 @@ SELECT deflate('compress me'::bytea, 9);
 
 ### `inflate`
 
+```text
 inflate ( compressed bytea ) → bytea
+```
 
 #### `inflate` Description
 
@@ -190,9 +198,11 @@ SELECT convert_from(inflate(deflate('hello world')), 'UTF8');
 
 ### `gzip`
 
-gzip ( uncompressed bytea \[, compression_level integer \] ) → bytea
+```text
+gzip ( uncompressed bytea [, compression_level integer ] ) → bytea
 
-gzip ( uncompressed text \[, compression_level integer \] ) → bytea
+gzip ( uncompressed text [, compression_level integer ] ) → bytea
+```
 
 #### `gzip` Description
 
@@ -218,7 +228,11 @@ SELECT gzip('hello world'::bytea, 9);
 
 ### `gunzip` (aka `ungzip`)
 
+```text
 gunzip ( compressed bytea ) → bytea
+
+ungzip ( compressed bytea ) → bytea
+```
 
 #### `gunzip` Description
 
@@ -254,9 +268,11 @@ All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
 
 ### `lz4`
 
-lz4 ( uncompressed bytea \[, compression_level integer \] ) → bytea
+```text
+lz4 ( uncompressed bytea [, compression_level integer ] ) → bytea
 
-lz4 ( uncompressed text \[, compression_level integer \] ) → bytea
+lz4 ( uncompressed text [, compression_level integer ] ) → bytea
+```
 
 #### `lz4` Description
 
@@ -284,7 +300,9 @@ SELECT lz4('hello world');
 
 ### `unlz4`
 
+```text
 unlz4 ( compressed bytea ) → bytea
+```
 
 #### `unlz4` Description
 
@@ -296,7 +314,7 @@ according to RFC 8478.
 Input sequences must represent valid payloads compressed strictly via the
 matching `lz4()` implementation functions.
 
-#### Examples
+#### `unlz4` Examples
 
 ```sql
 SELECT convert_from(unlz4(lz4('hello world')), 'UTF8');
@@ -321,9 +339,11 @@ layer and the internal multithreading logic of the Zstandard library.
 
 ### `zstd`
 
-zstd ( uncompressed bytea \[, compression_level integer \[, threads integer \] \] ) → bytea
+```text
+zstd ( uncompressed bytea [, compression_level integer [, threads integer ] ] ) → bytea
 
-zstd ( uncompressed text \[, compression_level integer \[, threads integer \] \] ) → bytea
+zstd ( uncompressed text [, compression_level integer [, threads integer ] ] ) → bytea
+```
 
 #### `zstd` Description
 
@@ -350,7 +370,9 @@ SELECT zstd('hello world', 7, 2);
 
 ### `unzstd`
 
+```text
 unzstd ( compressed bytea ) → bytea
+```
 
 #### `unzstd` Description
 

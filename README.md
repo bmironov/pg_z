@@ -200,7 +200,7 @@ via the `REGRESS` variable in the `Makefile`. Then, it will compare their
 output with the corresponding samples (`.out` files in the `expected` directory).
 In case of successful unit test run, output should look similar this:
 
-```
+```text
 # +++ regress install-check in  +++
 # using postmaster on Unix socket, default port
 ok 1         - brotli                                     45 ms
@@ -243,12 +243,12 @@ ensure high performance for both small and large documents.
 
 ### PostgreSQL-Integrated Memory Management & Parallel Safety
 
-All supported compression algorithms (`gzip`, `lz4`, and `zstd`) leverage
-custom allocators tied directly into the PostgreSQL memory manager. This
-architecture prevents memory leaks and enables specialized allocation
+All supported compression algorithms (`brotli`, `gzip`, `lz4`, and `zstd`)
+leverage custom allocators tied directly into the PostgreSQL memory manager.
+This architecture prevents memory leaks and enables specialized allocation
 optimizations.
 
-As a result, `gzip` and `lz4` functions are safely marked as
+As a result, `brotli`, `gzip` and `lz4` functions are safely marked as
 **`PARALLEL SAFE`**. However, because `zstd` manages its own internal threads
 outside of PostgreSQL's control, `zstd`-related functions are marked as
 **`PARALLEL UNSAFE`**.
@@ -290,7 +290,7 @@ Since `pg_z` uses its own set of static HMP, you need to account for that and
 allocate extra pages on top of the pages required by PostgreSQL itself. Their
 quantity can be calculated roughly as follows:
 
-```
+```text
 N = A * D / S,
 where
 N - number of HMPs
