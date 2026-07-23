@@ -1,4 +1,3 @@
-/* PostgreSQL */
 #include <postgres.h>
 
 #include <fmgr.h>
@@ -45,8 +44,6 @@ extern size_t max_uncompressed_size;
  */
 
 void pg_mem_tracker_init_hugepage_size(void);
-void pg_mem_tracker_init(void);
-void pg_mem_tracker_untrack(void *address);
 
 /*
  * ===============================================================
@@ -57,8 +54,8 @@ void pg_mem_tracker_untrack(void *address);
 extern size_t huge_page_size;
 
 void *pg_hybrid_alloc(size_t *size);
-void *pg_hybrid_repalloc(void *address, size_t prev_size, size_t *new_size);
-void pg_hybrid_free(void *opaque, void *address);
+void *pg_hybrid_repalloc(void *address, size_t *new_size);
+void pg_hybrid_free(void *address);
 
 /*
  * ===============================================================

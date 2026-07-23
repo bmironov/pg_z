@@ -1,5 +1,3 @@
-
-#include "c.h"
 #include "pg_z.h"
 
 #define LZ4F_STATIC_LINKING_ONLY // Open access to custom memory management API
@@ -78,7 +76,6 @@ pg_lz4(PG_FUNCTION_ARGS)
 		elog(ERROR, "compression level must be in range 0..12");
 	}
 
-	pg_mem_tracker_init();
 	cmem = get_pg_lz4_allocator();
 	cCtx = LZ4F_createCompressionContext_advanced(cmem, LZ4F_VERSION);
 	if (cCtx == NULL) {
@@ -123,6 +120,7 @@ pg_lz4(PG_FUNCTION_ARGS)
 	if (LZ4F_isError(ret)) {
 		LZ4F_freeCompressionContext(cCtx);
 		PG_FREE_IF_COPY(in_varlena, 0);
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "LZ4F_compressBegin failed: %s", LZ4F_getErrorName(ret));
 	}
 	total_written += ret;
@@ -138,6 +136,7 @@ pg_lz4(PG_FUNCTION_ARGS)
 	if (LZ4F_isError(ret)) {
 		LZ4F_freeCompressionContext(cCtx);
 		PG_FREE_IF_COPY(in_varlena, 0);
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "LZ4F_compressUpdate failed: %s", LZ4F_getErrorName(ret));
 	}
 	total_written += ret;
@@ -188,7 +187,6 @@ pg_unlz4(PG_FUNCTION_ARGS)
 		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
-	pg_mem_tracker_init();
 	cmem = get_pg_lz4_allocator();
 	dCtx = LZ4F_createDecompressionContext_advanced(cmem, LZ4F_VERSION);
 	if (dCtx == NULL) {
@@ -240,6 +238,7 @@ pg_unlz4(PG_FUNCTION_ARGS)
 		if (LZ4F_isError(ret)) {
 			LZ4F_freeDecompressionContext(dCtx);
 			PG_FREE_IF_COPY(in_varlena, 0);
+			pg_hybrid_free(out_buf);
 			elog(ERROR, "decompression failed: %s", LZ4F_getErrorName(ret));
 		}
 
@@ -252,6 +251,7 @@ pg_unlz4(PG_FUNCTION_ARGS)
 
 			LZ4F_freeDecompressionContext(dCtx);
 			PG_FREE_IF_COPY(in_varlena, 0);
+			pg_hybrid_free(out_buf);
 			elog(ERROR,
 				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 				 max_uncompressed_size);
@@ -265,14 +265,11 @@ pg_unlz4(PG_FUNCTION_ARGS)
 
 			allocated_size += memory_chunk_size;
 
-			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf,
-					allocated_size - memory_chunk_size,
-					&allocated_size);
+			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 			if (tmp_buf == NULL) {
 				LZ4F_freeDecompressionContext(dCtx);
-				pg_mem_tracker_untrack(out_buf);
 				PG_FREE_IF_COPY(in_varlena, 0);
+				pg_hybrid_free(out_buf);
 				elog(ERROR,
 					 "out of memory during buffer resize to %zu bytes",
 					 allocated_size);

@@ -262,7 +262,7 @@ TLB cache misses.
 
 ### Tuple-Scoped Context Lifecycle
 
-The custom memory manager is attached to **`CurrentMemoryContext`**, which
+The custom [Memory Manager][6] is attached to **`CurrentMemoryContext`**, which
 lives only for the duration of processing a single tuple. Once the tuple is
 processed, all memory allocated by the extension's functions is automatically
 freed. This approach is highly resource-efficient compared to attaching
@@ -317,3 +317,4 @@ a universal reference to compression as in `.Z` file type.
 [3]: https://www.postgresql.org/docs/current/extend-pgxs.html
 [4]: USAGE.md
 [5]: DATA_FLOW.md
+[6]: MEMORY_MANAGER.md

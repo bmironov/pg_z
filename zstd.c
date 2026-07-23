@@ -1,4 +1,3 @@
-
 #include "pg_z.h"
 
 #define ZSTD_STATIC_LINKING_ONLY // Expose advanced types like ZSTD_customMem
@@ -78,8 +77,6 @@ pg_zstd(PG_FUNCTION_ARGS)
 			 compression_level);
 	}
 
-	pg_mem_tracker_init();
-
 	// Create a Zstd Context
 	cctx = ZSTD_createCCtx_advanced(zstd_allocator);
 	if (cctx == NULL) {
@@ -93,7 +90,7 @@ pg_zstd(PG_FUNCTION_ARGS)
 	if (out_buf == NULL) {
 		ZSTD_freeCCtx(cctx); // Free context to prevent memory leak
 		PG_FREE_IF_COPY(in_varlena, 0);
-		pg_mem_tracker_untrack(out_buf);
+		pg_hybrid_free(out_buf);
 		elog(ERROR,
 			 "out of memory allocating %zu byte buffer",
 			 max_dst_size + VARHDRSZ);
@@ -157,8 +154,6 @@ pg_unzstd(PG_FUNCTION_ARGS)
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR, "decompression error: Uncompressed size unknown");
 	}
-
-	pg_mem_tracker_init();
 
 	// Instantiate Decompression Context using our Postgres palloc wrapper
 	dctx = ZSTD_createDCtx_advanced(zstd_allocator);

@@ -1,5 +1,3 @@
-
-#include "c.h"
 #include "pg_z.h"
 
 #include <zlib.h>
@@ -71,7 +69,6 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 			 "invalid compression level (outside of -1..9): %d",
 			 compression_level);
 
-	pg_mem_tracker_init();
 	zs.zalloc = pg_zlib_alloc;
 	zs.zfree = pg_zlib_free;
 	zs.opaque = Z_NULL;
@@ -115,13 +112,11 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 		 */
 		if (ret == Z_OK && zs.avail_out == 0) {
 			allocated_size += memory_chunk_size;
-			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf,
-					allocated_size - memory_chunk_size,
-					&allocated_size);
+			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 			if (tmp_buf == NULL) {
 				deflateEnd(&zs);
 				PG_FREE_IF_COPY(in_varlena, 0);
+				pg_hybrid_free(out_buf);
 				elog(ERROR,
 					 "out of memory during compression buffer reallocation to "
 					 "%zu bytes",
@@ -225,7 +220,6 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
-	pg_mem_tracker_init();
 	zs.zalloc = pg_zlib_alloc;
 	zs.zfree = pg_zlib_free;
 	zs.opaque = Z_NULL;
@@ -262,6 +256,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 
 			inflateEnd(&zs);
 			PG_FREE_IF_COPY(in_varlena, 0);
+			pg_hybrid_free(out_buf);
 
 			elog(ERROR,
 				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
@@ -271,13 +266,11 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 		if (ret == Z_OK && zs.avail_out == 0) {
 			// double size of allocation to minimize number of repalloc calls
 			allocated_size += memory_chunk_size;
-			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf,
-					allocated_size - memory_chunk_size,
-					&allocated_size);
+			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 			if (tmp_buf == NULL) {
 				inflateEnd(&zs);
 				PG_FREE_IF_COPY(in_varlena, 0);
+				pg_hybrid_free(out_buf);
 				elog(ERROR,
 					 "out of memory during decompression buffer reallocation "
 					 "to %zu bytes",

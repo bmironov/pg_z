@@ -1,4 +1,3 @@
-#include "c.h"
 #include "pg_z.h"
 
 #include <alloca.h>
@@ -96,7 +95,7 @@ pg_brotli(PG_FUNCTION_ARGS)
 			pg_brotli_alloc, pg_brotli_free, (void *)CurrentMemoryContext);
 	if (state == NULL) {
 		PG_FREE_IF_COPY(in_varlena, 0);
-		pg_mem_tracker_untrack(out_buf);
+		pg_hybrid_free(out_buf);
 		elog(ERROR,
 			 "Brotli compression failed: could not initialize encoder state");
 	}
@@ -178,7 +177,7 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 			pg_brotli_alloc, pg_brotli_free, (void *)CurrentMemoryContext);
 	if (state == NULL) {
 		PG_FREE_IF_COPY(in_varlena, 0);
-		pg_mem_tracker_untrack(out_buf);
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "failed to create Brotli decompression decoder");
 	}
 
@@ -208,7 +207,7 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 			out_offset > (size_t)max_uncompressed_size) {
 			BrotliDecoderDestroyInstance(state);
 			PG_FREE_IF_COPY(in_varlena, 0);
-			pg_mem_tracker_untrack(out_buf);
+			pg_hybrid_free(out_buf);
 			elog(ERROR,
 				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 				 max_uncompressed_size);
@@ -221,11 +220,10 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 														  : memory_chunk_size;
 			allocated_size += dynamic_step;
 
-			tmp_buf = (uint8 *)pg_hybrid_repalloc(
-					out_buf, old_size, &allocated_size);
+			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 			if (tmp_buf == NULL) {
 				PG_FREE_IF_COPY(in_varlena, 0);
-				pg_mem_tracker_untrack(out_buf);
+				pg_hybrid_free(out_buf);
 				elog(ERROR,
 					 "out of memory during buffer resize to %zu bytes",
 					 allocated_size);

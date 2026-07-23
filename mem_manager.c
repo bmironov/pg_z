@@ -1,26 +1,26 @@
-
 #include "pg_z.h"
+
+#include <utils/hsearch.h> // PostgreSQL hash library
 
 #include <sys/mman.h>
 
-// Max number of tracked regions within single function call
-#define MAX_TRACKED_PAGES 256
-
 #define MIN_HUGE_PAGE_SIZE ((size_t)2 * 1024 * 1024)
 
-typedef int16 registry_index;
+size_t huge_page_size; // actual size of Huge Page on the system
 
-typedef struct HugePageTrack {
-	void *address;		// exact address returned by mmap or palloc
+// The key used for hashing: the raw memory address pointer
+typedef struct PageHashKey {
+	void *address;
+} PageHashKey;
+
+// The full entry stored inside the hash table
+typedef struct PageHashEntry {
+	PageHashKey key;	// Hash Key (MUST be 1st)
 	size_t region_size; // exact allocated region size
 	bool is_huge;		// allocation type: true (mmap), false (palloc)
-} HugePageTrack;
+} PageHashEntry;
 
-// Memory region tracker
-static HugePageTrack page_registry[MAX_TRACKED_PAGES];
-static int tracked_pages_count = 0;
-
-size_t huge_page_size;
+static HTAB *page_registry_hash = NULL; // Global pointer to runtime hash table
 
 static MemoryContextCallback registry_cleanup_callback;
 static MemoryContext last_registered_context = NULL;
@@ -59,173 +59,147 @@ pg_mem_tracker_init_hugepage_size(void)
 }
 
 /*
- * Automatic PostgreSQL Context Callback.
+ * Initializes the dynamic hash table.
+ * It is invoked lazily and allocated inside TopMemoryContext to ensure
+ * hash control blocks persist across row-level context resets.
+ */
+static void
+pg_mem_tracker_init_hash(void)
+{
+	HASHCTL ctl;
+	int flags;
+
+	if (page_registry_hash != NULL)
+		return;
+
+	memset(&ctl, 0, sizeof(ctl));
+	ctl.keysize = sizeof(PageHashKey);
+	ctl.entrysize = sizeof(PageHashEntry);
+	ctl.hcxt =
+			TopMemoryContext; /* Persistent memory context for hash metadata */
+
+	flags = HASH_ELEM | HASH_CONTEXT;
+
+	page_registry_hash = hash_create(
+			"pg_z memory tracking registry",
+			1024, /* Initial bucket segment allocation count */
+			&ctl,
+			flags);
+}
+
+/*
+ * Tuple Lifecycle Engine Callback.
+ * Loops through active allocations when PostgreSQL destroys/resets the row
+ * context.
  */
 static void
 pg_mem_tracker_cleanup(void *arg)
 {
-	registry_index i;
+	HASH_SEQ_STATUS status;
+	PageHashEntry *curr_entry = NULL, *next_entry = NULL;
+	bool flag = true;
 
-	for (i = 0; i < tracked_pages_count; i++) {
-		if (page_registry[i].address != NULL && page_registry[i].is_huge) {
-			munmap(page_registry[i].address, page_registry[i].region_size);
-			page_registry[i].address = NULL;
-			page_registry[i].region_size = 0;
-			page_registry[i].is_huge = false;
+	if (page_registry_hash == NULL)
+		return;
+
+	/* Initialize sequential hash scanning iterator across buckets */
+	hash_seq_init(&status, page_registry_hash);
+	curr_entry = (PageHashEntry *)hash_seq_search(&status);
+
+	do {
+		if (curr_entry == NULL) {
+			flag = false;
+		} else {
+			next_entry = (PageHashEntry *)hash_seq_search(&status);
+			// release the segment if it was allocated as Huge Memory Page
+			if (curr_entry->key.address != NULL && curr_entry->is_huge) {
+				munmap(curr_entry->key.address, curr_entry->region_size);
+			}
+			hash_search(
+					page_registry_hash, &curr_entry->key, HASH_REMOVE, NULL);
+			curr_entry = next_entry;
 		}
-	}
+	} while (flag);
 
-	tracked_pages_count = 0;
 	last_registered_context = NULL;
 }
 
-// Initialize registry
-// and attach tracking to PostgreSQL memory context life cycle
-void
-pg_mem_tracker_init(void)
-{
-	registry_index i;
-	MemoryContextCallback *dynamic_cb;
-
-	if (tracked_pages_count > 0) {
-		tracked_pages_count = 0;
-		return;
-	}
-
-	for (i = 0; i < MAX_TRACKED_PAGES; i++) {
-		page_registry[i].address = NULL;
-		page_registry[i].region_size = 0;
-		page_registry[i].is_huge = false;
-	}
-
-	// Attach to Postgres callback to release all allocated memory after TXN
-	dynamic_cb =
-			(MemoryContextCallback *)palloc(sizeof(MemoryContextCallback));
-	dynamic_cb->func = pg_mem_tracker_cleanup;
-	dynamic_cb->arg = NULL;
-
-	MemoryContextRegisterResetCallback(CurrentMemoryContext, dynamic_cb);
-}
-
-// Find region index in our registry
-static registry_index
-pg_mem_tracker_find_index(void *address)
-{
-	registry_index i;
-
-	for (i = 0; i < tracked_pages_count; i++) {
-		if (page_registry[i].address == address)
-			return i;
-	}
-
-	return -1;
-}
-
-// Register new mem region
+/*
+ * O(1) Replacement for pg_mem_tracker_register.
+ * Inserts or updates an allocation entry inside the hash layout without
+ * risk of rigid static registry overflows.
+ */
 static void
 pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 {
-	registry_index i, j = 0;
+	PageHashKey hash_key;
+	PageHashEntry *entry;
+	bool found;
 
-	// Lazy cleanup of non Huge Pages is possible,
-	// as they will be released by PostgreSQL automatically
-	if (tracked_pages_count >= MAX_TRACKED_PAGES) {
-		for (i = 0; i < tracked_pages_count; i++) {
-			if (page_registry[i].is_huge) {
-				if (i != j) {
-					page_registry[j] = page_registry[i];
-				}
-				j++;
-			}
-		}
-		tracked_pages_count = j;
-
-		if (tracked_pages_count >= MAX_TRACKED_PAGES)
-			elog(ERROR,
-				 "Memory regions registry overflow."
-				 " Too many allocations in a single query (%d).",
-				 tracked_pages_count);
-	}
-
-	page_registry[tracked_pages_count].address = address;
-	page_registry[tracked_pages_count].region_size = size;
-	page_registry[tracked_pages_count].is_huge = is_huge;
-	tracked_pages_count++;
-}
-
-// Unregister specific mem region
-static void
-pg_mem_tracker_unregister(registry_index index)
-{
-	registry_index i;
-
-	if (index < 0 || index > tracked_pages_count)
+	if (address == NULL)
 		return;
 
-	for (i = index; i < tracked_pages_count; i++) {
-		page_registry[i] = page_registry[i + 1];
+	pg_mem_tracker_init_hash();
+
+	/*
+	 * Ensure the lifecycle cleanup callback is pinned
+	 * to the current row context
+	 */
+	if (last_registered_context != CurrentMemoryContext) {
+		registry_cleanup_callback.func = pg_mem_tracker_cleanup;
+		registry_cleanup_callback.arg = NULL;
+		MemoryContextRegisterResetCallback(
+				CurrentMemoryContext, &registry_cleanup_callback);
+		last_registered_context = CurrentMemoryContext;
 	}
 
-	tracked_pages_count--;
-	page_registry[tracked_pages_count].address = NULL;
-	page_registry[tracked_pages_count].region_size = 0;
-	page_registry[tracked_pages_count].is_huge = false;
+	hash_key.address = address;
+
+	/* Perform an O(1) entry insertion search */
+	entry = (PageHashEntry *)hash_search(
+			page_registry_hash, &hash_key, HASH_ENTER, &found);
+
+	/* Populate or update tracking metadata metrics */
+	entry->region_size = size;
+	entry->is_huge = is_huge;
 }
 
 /*
- * High-level manager finalization call.
- * 1. Checks if iprovided address is a tracked Huge Page block.
- * 2. If true, unregisters it to protect it from instant unmapping, allowing
- *    PostgreSQL to safely send this row's Datum up to the executor pipeline.
- * 3. Instantly flushes (munmap) any remaining temporary garbage/working chunks
- *    that accumulated during loop reallocations, freeing RAM on every single
- * row.
+ * O(1) Instant Lookup wrapper.
+ * Safely replaces pg_mem_tracker_find_index to bypass linear iteration loops.
  */
-void
-pg_mem_tracker_untrack(void *address)
+static PageHashEntry *
+pg_mem_tracker_find(void *address)
 {
-	registry_index i, idx = -1;
-	size_t final_size = 0;
-	bool is_huge = false;
+	PageHashKey hash_key;
 
-	if (address == NULL) {
+	if (page_registry_hash == NULL || address == NULL)
+		return NULL;
+
+	hash_key.address = address;
+
+	/* High-performance exact key bucket search */
+	return (PageHashEntry *)hash_search(
+			page_registry_hash, &hash_key, HASH_FIND, NULL);
+}
+
+/*
+ * O(1) Entry Unregistration removal wrapper.
+ * Completely eliminates old array-shifting routines and prevents garbage
+ * memory indexing.
+ */
+static void
+pg_mem_tracker_unregister(void *address)
+{
+	PageHashKey hash_key;
+
+	if (page_registry_hash == NULL || address == NULL)
 		return;
-	}
 
-	idx = pg_mem_tracker_find_index(address);
-	if (idx >= 0) {
-		final_size = page_registry[idx].region_size;
-		is_huge = page_registry[idx].is_huge;
-	}
+	hash_key.address = address;
 
-	/*
-	 * Instantly unmap any temporary working buffers left in the registry
-	 * before transitioning to the next row processing. Crucial for million-row
-	 * transactions!
-	 */
-	for (i = 0; i < tracked_pages_count; i++) {
-		if (page_registry[i].address != NULL &&
-			page_registry[i].address != address) {
-			if (page_registry[i].is_huge) {
-				munmap(page_registry[i].address, page_registry[i].region_size);
-			} else {
-				pfree(page_registry[i].address);
-			}
-		}
-
-		page_registry[i].address = NULL;
-		page_registry[i].region_size = 0;
-		page_registry[i].is_huge = false;
-	}
-
-	tracked_pages_count = 0;
-
-	if (idx >= 0) {
-		page_registry[0].address = address;
-		page_registry[0].region_size = final_size;
-		page_registry[0].is_huge = is_huge;
-		tracked_pages_count = 1;
-	}
+	/* Evict the matching entry cleanly from the hash table bucket */
+	hash_search(page_registry_hash, &hash_key, HASH_REMOVE, NULL);
 }
 
 /*
@@ -236,7 +210,7 @@ pg_mem_tracker_untrack(void *address)
 
 /*
  * pg_hybrid_alloc attempts to allocate memory region in Static Huge Pages
- * if requested size smaller than CHUNK_SIZE, then standard
+ * if requested size smaller than memory_chunk_size, then standard
  * palloc_extended is used.
  * palloc calls do not register in tracker
  */
@@ -251,15 +225,6 @@ pg_hybrid_alloc(size_t *size)
 		// rounding up size to closest memory_chunk_size multiple
 		req_size = (req_size + (memory_chunk_size - 1)) &
 				   ~(memory_chunk_size - 1);
-	}
-
-	if (CurrentMemoryContext != last_registered_context) {
-		registry_cleanup_callback.func = pg_mem_tracker_cleanup;
-		registry_cleanup_callback.arg = NULL;
-
-		MemoryContextRegisterResetCallback(
-				CurrentMemoryContext, &registry_cleanup_callback);
-		last_registered_context = CurrentMemoryContext;
 	}
 
 	if (req_size >= huge_page_size) {
@@ -294,73 +259,68 @@ pg_hybrid_alloc(size_t *size)
  * pg_hybrid_repalloc reallocates memory based on HugePageHeader struct
  */
 void *
-pg_hybrid_repalloc(void *address, size_t prev_size, size_t *new_size)
+pg_hybrid_repalloc(void *address, size_t *size)
 {
+	PageHashEntry *entry = NULL;
 	void *new_address = NULL;
-	registry_index old_idx = -1;
-	bool old_is_huge = false;
-	size_t old_size = 0, req_size = *new_size;
+	size_t req_size = *size;
 
 	if (address == NULL)
-		return pg_hybrid_alloc(new_size);
+		return pg_hybrid_alloc(size);
 
-	old_idx = pg_mem_tracker_find_index(address);
-	if (old_idx < 0) {
-		if (req_size < memory_chunk_size) {
-			new_address = repalloc(address, req_size);
-			*new_size = req_size;
-			return new_address;
-		}
-
-		old_size = prev_size;
-		old_is_huge = false;
-	} else {
-		old_size = page_registry[old_idx].region_size;
-		old_is_huge = page_registry[old_idx].is_huge;
-
-		if (req_size <= old_size) {
-			*new_size = old_size;
-			return address;
-		}
+	if (req_size == 0) {
+		pg_hybrid_free(address);
+		return NULL;
 	}
 
-	new_address = pg_hybrid_alloc(new_size);
+	entry = pg_mem_tracker_find(address);
+
+	// Don't deal with allocations outside of our registry
+	if (entry == NULL) {
+		return NULL;
+	}
+
+	// Don't waste time for shrinking allocated segment
+	// This allocation will be released after tuple processing is over anyway
+	if (*size <= entry->region_size) {
+		*size = entry->region_size;
+		return address;
+	}
+
+	new_address = pg_hybrid_alloc(size);
 	if (new_address == NULL)
 		return NULL;
 
-	memcpy(new_address, address, old_size);
+	memcpy(new_address, address, entry->region_size);
 
-	if (old_is_huge)
-		munmap(address, old_size);
-	else
-		pfree(address);
-
-	if (old_idx >= 0)
-		pg_mem_tracker_unregister(old_idx);
+	pg_hybrid_free(address);
 
 	return new_address;
 }
 
 /*
- * pg_hybrid_free releases memory based on HugePageHeader struct
+ * pg_hybrid_free releases memory based on our hash
  */
 void
-pg_hybrid_free(void *opaque, void *address)
+pg_hybrid_free(void *address)
 {
-	registry_index old_idx;
+	PageHashEntry *entry;
 
 	if (address == NULL)
 		return;
 
-	old_idx = pg_mem_tracker_find_index(address);
-	if (old_idx >= 0) {
-		if (page_registry[old_idx].is_huge)
-			munmap(address, page_registry[old_idx].region_size);
-		else
-			pfree(address);
+	entry = pg_mem_tracker_find(address);
 
-		pg_mem_tracker_unregister(old_idx);
+	// Don't deal with allocations outside of our registry
+	if (entry == NULL) {
+		return;
+	}
+
+	if (entry->is_huge) {
+		munmap(address, entry->region_size);
 	} else {
 		pfree(address);
 	}
+
+	pg_mem_tracker_unregister(address);
 }
