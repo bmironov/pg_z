@@ -1,26 +1,33 @@
 #include "pg_z.h"
 
-#include <utils/hsearch.h> // PostgreSQL hash library
-
+#include <limits.h> // Required for SHRT_MAX
+#include <stdlib.h> // Required for abs()
 #include <sys/mman.h>
 
 #define MIN_HUGE_PAGE_SIZE ((size_t)2 * 1024 * 1024)
 
 size_t huge_page_size; // actual size of Huge Page on the system
 
-// The key used for hashing: the raw memory address pointer
-typedef struct PageHashKey {
-	void *address;
-} PageHashKey;
+#define REGISTRY_PAGE_SIZE 8192 // chunk step
+typedef int16 registry_index;
+#define MAX_REGISTRY_INDEX SHRT_MAX // 32767 is max for signed int16
 
 // The full entry stored inside the hash table
-typedef struct PageHashEntry {
-	PageHashKey key;	// Hash Key (MUST be 1st)
-	size_t region_size; // exact allocated region size
-	bool is_huge;		// allocation type: true (mmap), false (palloc)
-} PageHashEntry;
+typedef struct MemTracker {
+	void *address;	   // pointer to memory region
+	int32 region_size; // Positive: Huge Pages, Negative: palloc (4kB)
+} MemTracker;
 
-static HTAB *page_registry_hash = NULL; // Global pointer to runtime hash table
+static MemTracker *page_registry = NULL;
+
+// counter of tracked regions
+static registry_index tracked_pages_count = 0;
+
+// current capacity of memory tracker
+static registry_index tracked_pages_capacity = 0;
+
+// allocated memory size for tracker
+static size_t allocated_size = 0;
 
 static MemoryContextCallback registry_cleanup_callback;
 static MemoryContext last_registered_context = NULL;
@@ -64,87 +71,93 @@ pg_mem_tracker_init_hugepage_size(void)
  * hash control blocks persist across row-level context resets.
  */
 static void
-pg_mem_tracker_init_hash(void)
+pg_mem_tracker_init(void)
 {
-	HASHCTL ctl;
-	int flags;
+	registry_index init_capacity;
+	MemoryContext old_context;
 
-	if (page_registry_hash != NULL)
+	if (page_registry != NULL)
 		return;
 
-	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize = sizeof(PageHashKey);
-	ctl.entrysize = sizeof(PageHashEntry);
-	ctl.hcxt =
-			TopMemoryContext; /* Persistent memory context for hash metadata */
+	allocated_size = REGISTRY_PAGE_SIZE;
+	init_capacity = allocated_size / sizeof(MemTracker);
 
-	flags = HASH_ELEM | HASH_CONTEXT;
+	/*
+	 * Switching to TopMemoryContext allows to initialize registry
+	 * once per session
+	 */
+	old_context = MemoryContextSwitchTo(TopMemoryContext);
 
-	page_registry_hash = hash_create(
-			"pg_z memory tracking registry",
-			1024, /* Initial bucket segment allocation count */
-			&ctl,
-			flags);
+	page_registry = (MemTracker *)palloc_extended(
+			REGISTRY_PAGE_SIZE, MCXT_ALLOC_NO_OOM);
+
+	MemoryContextSwitchTo(old_context);
+
+	if (page_registry == NULL) {
+		allocated_size = 0;
+		elog(ERROR, "failed to initialize memory tracking registry");
+		return;
+	}
+
+	tracked_pages_capacity = init_capacity;
 }
 
 /*
  * Tuple Lifecycle Engine Callback.
- * Loops through active allocations when PostgreSQL destroys/resets the row
- * context.
+ * Loops through active allocations when PostgreSQL
+ * destroys/resets the row context.
  */
 static void
 pg_mem_tracker_cleanup(void *arg)
 {
-	HASH_SEQ_STATUS status;
-	PageHashEntry *curr_entry = NULL, *next_entry = NULL;
+	registry_index i = 0;
+	void *address = NULL;
+	int32 region_size = 0;
+	size_t actual_size;
 	bool flag = true;
 
-	if (page_registry_hash == NULL)
+	if (tracked_pages_count == 0) {
+		last_registered_context = NULL;
 		return;
-
-	/* Initialize sequential hash scanning iterator across buckets */
-	hash_seq_init(&status, page_registry_hash);
-	curr_entry = (PageHashEntry *)hash_seq_search(&status);
+	}
 
 	do {
-		if (curr_entry == NULL) {
+		if (i >= tracked_pages_count) {
 			flag = false;
 		} else {
-			next_entry = (PageHashEntry *)hash_seq_search(&status);
-			// release the segment if it was allocated as Huge Memory Page
-			if (curr_entry->key.address != NULL && curr_entry->is_huge) {
-				munmap(curr_entry->key.address, curr_entry->region_size);
+			address = page_registry[i].address;
+			region_size = page_registry[i].region_size;
+
+			// Positive region indicates an active OS Huge Page allocation
+			if (address != NULL && region_size > 0) {
+				actual_size = (size_t)abs(region_size);
+				// just being paranoid after playing with sign bits in size
+				munmap(address, actual_size);
 			}
-			hash_search(
-					page_registry_hash, &curr_entry->key, HASH_REMOVE, NULL);
-			curr_entry = next_entry;
+			i++;
 		}
 	} while (flag);
 
+	tracked_pages_count = 0;
 	last_registered_context = NULL;
 }
 
 /*
- * O(1) Replacement for pg_mem_tracker_register.
- * Inserts or updates an allocation entry inside the hash layout without
- * risk of rigid static registry overflows.
+ * Registers newly allocated segment
  */
 static void
 pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 {
-	PageHashKey hash_key;
-	PageHashEntry *entry;
-	bool found;
+	registry_index new_capacity = 0;
+	size_t new_size = 0;
+	MemTracker *tmp_registry = NULL;
 
 	if (address == NULL)
 		return;
 
-	pg_mem_tracker_init_hash();
+	pg_mem_tracker_init();
 
-	/*
-	 * Ensure the lifecycle cleanup callback is pinned
-	 * to the current row context
-	 */
+	/* Attach the tuple reset handler hook to CurrentMemoryContext */
 	if (last_registered_context != CurrentMemoryContext) {
 		registry_cleanup_callback.func = pg_mem_tracker_cleanup;
 		registry_cleanup_callback.arg = NULL;
@@ -153,53 +166,84 @@ pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 		last_registered_context = CurrentMemoryContext;
 	}
 
-	hash_key.address = address;
+	// Are we at maximum capacity already?
+	if (tracked_pages_count >= MAX_REGISTRY_INDEX) {
+		elog(ERROR,
+			 "Memory tracker overflow. "
+			 "Too many allocations in a single query row.");
+		return;
+	}
 
-	/* Perform an O(1) entry insertion search */
-	entry = (PageHashEntry *)hash_search(
-			page_registry_hash, &hash_key, HASH_ENTER, &found);
+	// Do we need to expand page_registry?
+	if (tracked_pages_count >= tracked_pages_capacity) {
+		new_size = allocated_size + REGISTRY_PAGE_SIZE;
+		new_capacity = new_size / sizeof(MemTracker);
 
-	/* Populate or update tracking metadata metrics */
-	entry->region_size = size;
-	entry->is_huge = is_huge;
+		if (new_capacity > MAX_REGISTRY_INDEX) {
+			elog(ERROR, "cannot expand memory tracker: too many elements");
+			return;
+		}
+
+		tmp_registry = (MemTracker *)repalloc(page_registry, new_size);
+		if (tmp_registry == NULL) {
+			elog(ERROR,
+				 "Memory tracker overflow during active row "
+				 "processing expansion.");
+			return;
+		}
+
+		page_registry = tmp_registry;
+		allocated_size = new_size;
+		tracked_pages_capacity = new_capacity;
+	}
+
+	page_registry[tracked_pages_count].address = address;
+
+	if (is_huge) {
+		page_registry[tracked_pages_count].region_size = (int32)size;
+	} else {
+		// Encode regular page allocation as negative value
+		page_registry[tracked_pages_count].region_size = -((int32)size);
+	}
+
+	tracked_pages_count++;
 }
 
 /*
- * O(1) Instant Lookup wrapper.
- * Safely replaces pg_mem_tracker_find_index to bypass linear iteration loops.
+ * Searches requested address in the registry
  */
-static PageHashEntry *
+static registry_index
 pg_mem_tracker_find(void *address)
 {
-	PageHashKey hash_key;
+	registry_index i = 0;
 
-	if (page_registry_hash == NULL || address == NULL)
-		return NULL;
+	if (address == NULL)
+		return -1;
 
-	hash_key.address = address;
+	for (i = 0; i < tracked_pages_count; i++) {
+		if (page_registry[i].address == address)
+			return i;
+	}
 
-	/* High-performance exact key bucket search */
-	return (PageHashEntry *)hash_search(
-			page_registry_hash, &hash_key, HASH_FIND, NULL);
+	return -1;
 }
 
 /*
- * O(1) Entry Unregistration removal wrapper.
- * Completely eliminates old array-shifting routines and prevents garbage
- * memory indexing.
+ * Removes information about memory region from the registry
  */
 static void
-pg_mem_tracker_unregister(void *address)
+pg_mem_tracker_unregister(registry_index index)
 {
-	PageHashKey hash_key;
+	registry_index i;
 
-	if (page_registry_hash == NULL || address == NULL)
+	if (index < 0 || index >= tracked_pages_count)
 		return;
 
-	hash_key.address = address;
+	for (i = index; i < tracked_pages_count - 1; i++) {
+		page_registry[i] = page_registry[i + 1];
+	}
 
-	/* Evict the matching entry cleanly from the hash table bucket */
-	hash_search(page_registry_hash, &hash_key, HASH_REMOVE, NULL);
+	tracked_pages_count--;
 }
 
 /*
@@ -256,14 +300,14 @@ pg_hybrid_alloc(size_t *size)
 }
 
 /*
- * pg_hybrid_repalloc reallocates memory based on HugePageHeader struct
+ * pg_hybrid_repalloc reallocates memory based on information from tracker
  */
 void *
 pg_hybrid_repalloc(void *address, size_t *size)
 {
-	PageHashEntry *entry = NULL;
+	registry_index index = -1;
 	void *new_address = NULL;
-	size_t req_size = *size;
+	size_t req_size = *size, region_size = 0;
 
 	if (address == NULL)
 		return pg_hybrid_alloc(size);
@@ -273,17 +317,19 @@ pg_hybrid_repalloc(void *address, size_t *size)
 		return NULL;
 	}
 
-	entry = pg_mem_tracker_find(address);
+	index = pg_mem_tracker_find(address);
 
 	// Don't deal with allocations outside of our registry
-	if (entry == NULL) {
+	if (index < 0) {
 		return NULL;
 	}
 
+	region_size = (size_t)abs(page_registry[index].region_size);
+
 	// Don't waste time for shrinking allocated segment
 	// This allocation will be released after tuple processing is over anyway
-	if (*size <= entry->region_size) {
-		*size = entry->region_size;
+	if (*size <= region_size) {
+		*size = region_size;
 		return address;
 	}
 
@@ -291,7 +337,7 @@ pg_hybrid_repalloc(void *address, size_t *size)
 	if (new_address == NULL)
 		return NULL;
 
-	memcpy(new_address, address, entry->region_size);
+	memcpy(new_address, address, region_size);
 
 	pg_hybrid_free(address);
 
@@ -304,23 +350,26 @@ pg_hybrid_repalloc(void *address, size_t *size)
 void
 pg_hybrid_free(void *address)
 {
-	PageHashEntry *entry;
+	registry_index index = -1;
+	size_t region_size;
 
 	if (address == NULL)
 		return;
 
-	entry = pg_mem_tracker_find(address);
+	index = pg_mem_tracker_find(address);
 
 	// Don't deal with allocations outside of our registry
-	if (entry == NULL) {
+	if (index < 0) {
 		return;
 	}
 
-	if (entry->is_huge) {
-		munmap(address, entry->region_size);
+	if (page_registry[index].region_size > 0) {
+		// Just extra paranoia since we play with sign in region size
+		region_size = (size_t)abs(page_registry[index].region_size);
+		munmap(address, region_size);
 	} else {
 		pfree(address);
 	}
 
-	pg_mem_tracker_unregister(address);
+	pg_mem_tracker_unregister(index);
 }
