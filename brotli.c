@@ -38,7 +38,7 @@ pg_brotli(PG_FUNCTION_ARGS)
 {
 	struct varlena *in_varlena = PG_GETARG_VARLENA_P(0);
 	int32 compression_level = PG_GETARG_INT32(1);
-	const uint8 *in_data = (uint8 *)(VARDATA(in_varlena));
+	const uint8 *in_data = (const uint8 *)(VARDATA(in_varlena));
 	size_t in_size = VARSIZE(in_varlena) - VARHDRSZ;
 
 	struct varlena *out_varlena = NULL;
@@ -95,7 +95,7 @@ pg_brotli(PG_FUNCTION_ARGS)
 			pg_brotli_alloc, pg_brotli_free, (void *)CurrentMemoryContext);
 	if (state == NULL) {
 		PG_FREE_IF_COPY(in_varlena, 0);
-		pg_hybrid_free(out_buf);
+		pg_hybrid_free(out_varlena);
 		elog(ERROR,
 			 "Brotli compression failed: could not initialize encoder state");
 	}
@@ -125,6 +125,7 @@ pg_brotli(PG_FUNCTION_ARGS)
 	PG_FREE_IF_COPY(in_varlena, 0);
 
 	if (status != BROTLI_TRUE) {
+		pg_hybrid_free(out_varlena);
 		elog(ERROR, "Brotli compression failed during stream processing");
 	}
 
@@ -145,11 +146,14 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 	size_t in_size = VARSIZE(in_varlena) - VARHDRSZ;
 
 	struct varlena *out_varlena = NULL;
-	uint8 *out_buf = NULL, *tmp_buf = NULL, *out_buf_ptr = NULL;
+	uint8 *out_buf = NULL; // flat buffer for decompressed data
+	uint8 *tmp_buf = NULL; // temporary buffer for streaming decompression
+	uint8 *tmp_buf_ptr = NULL, *out_buf_tmp = NULL;
 	const uint8 *next_in = NULL;
-	size_t allocated_size = 0, out_offset = 0;
-	size_t old_size = 0, dynamic_step = 0;
-	size_t available_in = 0, available_out = 0, prev_available_out = 0;
+	size_t allocated_size = 0, // real size of allocated memory for out_buf
+			out_offset = 0,	   // offset in out_buf
+			tmp_buf_size = memory_chunk_size; // size of tmp_buf
+	size_t available_in = 0, available_out = 0, decompressed_bytes = 0;
 	bool flag = true;
 
 	BrotliDecoderState *state = NULL;
@@ -164,6 +168,9 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 
 	// Usually text information compresses with ratio ~ 6:1
 	allocated_size = in_size * 6 + VARHDRSZ;
+	if (allocated_size < tmp_buf_size) {
+		allocated_size = tmp_buf_size;
+	}
 
 	out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 	if (out_buf == NULL) {
@@ -173,73 +180,92 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 			 allocated_size);
 	}
 
+	tmp_buf = (uint8 *)pg_hybrid_alloc(&tmp_buf_size);
+	if (tmp_buf == NULL) {
+		PG_FREE_IF_COPY(in_varlena, 0);
+		pg_hybrid_free(out_buf);
+		elog(ERROR,
+			 "out of memory allocating temp buffer %zu bytes",
+			 tmp_buf_size);
+	}
+
 	state = BrotliDecoderCreateInstance(
 			pg_brotli_alloc, pg_brotli_free, (void *)CurrentMemoryContext);
 	if (state == NULL) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		pg_hybrid_free(out_buf);
+		pg_hybrid_free(tmp_buf);
 		elog(ERROR, "failed to create Brotli decompression decoder");
 	}
 
 	available_in = in_size;
 	next_in = in_data;
-	out_offset = 0;
-
-	available_out = allocated_size - VARHDRSZ;
-	out_buf_ptr = (uint8 *)(out_buf + VARHDRSZ);
 
 	flag = true;
 
 	do {
-		prev_available_out = available_out;
+		// Making sure out out_buf has at least tmp_buf_size bytes available
+		if (out_offset + tmp_buf_size > allocated_size) {
+			allocated_size += tmp_buf_size;
+
+			out_buf_tmp =
+					(uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
+			if (out_buf_tmp == NULL) {
+				BrotliDecoderDestroyInstance(state);
+				PG_FREE_IF_COPY(in_varlena, 0);
+				pg_hybrid_free(out_buf);
+				pg_hybrid_free(tmp_buf);
+				elog(ERROR,
+					 "out of memory during buffer resize to %zu bytes",
+					 allocated_size);
+			}
+			out_buf = out_buf_tmp;
+		}
+
+		// following assignment is required because DescompressStream will
+		// alter parameter next_out value and move it forward
+		tmp_buf_ptr = tmp_buf;
+		available_out = tmp_buf_size - VARHDRSZ;
 
 		result = BrotliDecoderDecompressStream(
 				state,
 				&available_in,
 				&next_in,
 				&available_out,
-				&out_buf_ptr,
+				&tmp_buf_ptr,
 				NULL);
 
-		out_offset += (prev_available_out - available_out);
+		decompressed_bytes = tmp_buf_size - VARHDRSZ - available_out;
 
-		if (max_uncompressed_size >= 0 &&
-			out_offset > (size_t)max_uncompressed_size) {
-			BrotliDecoderDestroyInstance(state);
-			PG_FREE_IF_COPY(in_varlena, 0);
-			pg_hybrid_free(out_buf);
-			elog(ERROR,
-				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
-				 max_uncompressed_size);
+		if (decompressed_bytes > 0) {
+			// Keep VARHDRSZ bytes in the beginning  for future assignment
+			memcpy(out_buf + VARHDRSZ + out_offset,
+				   tmp_buf,
+				   decompressed_bytes);
+			out_offset += decompressed_bytes;
+
+			if (max_uncompressed_size >= 0 &&
+				out_offset > (size_t)max_uncompressed_size) {
+				BrotliDecoderDestroyInstance(state);
+				PG_FREE_IF_COPY(in_varlena, 0);
+				pg_hybrid_free(out_buf);
+				pg_hybrid_free(tmp_buf);
+				elog(ERROR,
+					 "decompressed output exceeds pg_z.max_size (%zu bytes)",
+					 max_uncompressed_size);
+			}
 		}
 
 		switch (result) {
-		case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT:
-			old_size = allocated_size;
-			dynamic_step = (old_size > memory_chunk_size) ? old_size
-														  : memory_chunk_size;
-			allocated_size += dynamic_step;
-
-			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
-			if (tmp_buf == NULL) {
-				PG_FREE_IF_COPY(in_varlena, 0);
-				pg_hybrid_free(out_buf);
-				elog(ERROR,
-					 "out of memory during buffer resize to %zu bytes",
-					 allocated_size);
-			}
-
-			if (tmp_buf != out_buf) {
-				out_buf_ptr = tmp_buf + (out_buf_ptr - out_buf);
-				out_buf = tmp_buf;
-			}
-
-			available_out += (allocated_size - old_size);
+		case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+			if (available_in == 0)
+				flag = false;
 			break;
-
+		case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT:
+			break;
 		case BROTLI_DECODER_RESULT_SUCCESS:
 		case BROTLI_DECODER_RESULT_ERROR:
-		case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+		default:
 			flag = false;
 			break;
 		}
@@ -247,8 +273,10 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 
 	BrotliDecoderDestroyInstance(state);
 	PG_FREE_IF_COPY(in_varlena, 0);
+	pg_hybrid_free(tmp_buf);
 
 	if (result != BROTLI_DECODER_RESULT_SUCCESS) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR,
 			 "decompression error %d: corrupted stream or invalid data",
 			 (int)result);

@@ -221,11 +221,18 @@ directly points to the performance of these algorithms.
 
 ### Zero-Copy Architecture
 
-The extension uses a zero-copy methodology where results are accumulated
-directly within a single memory region. This eliminates the need to copy data
-to another buffer before returning it to the requester. This approach provides
-significant performance benefits when processing multi-megabyte documents such
-as log files, JSON, or XML.
+The extension uses a zero-copy methodology where results accumulate directly
+within a single memory region. This eliminates the need to copy data to another
+buffer before returning it to the requester. This approach provides significant
+performance benefits when processing multi-megabyte documents such as log
+files, JSON, or XML.
+
+Brotli decompression is an exception here because compressed streams lack
+upfront uncompressed size information and require a consistent dictionary
+window for back-references. To ensure stability and prevent memory corruption,
+the engine pairs a best-guess initial allocation with optimized streaming
+through a temporary buffer. This approach compromises pure zero-copy design for
+Brotli to guarantee memory safety and predictable performance.
 
 ### Decompression Bomb Protection and Size Estimation
 
