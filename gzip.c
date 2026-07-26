@@ -55,19 +55,23 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
-	if (max_uncompressed_size >= 0 && in_size > max_uncompressed_size)
+	if (max_uncompressed_size >= 0 && in_size > max_uncompressed_size) {
+		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "input data is limited by pg_z.max_size (%zu bytes)",
 			 max_uncompressed_size);
+	}
 
 	/*
 	 * compression level -1 is default best effort (approx 6)
 	 * level 0 is no compression, 1-9 are lowest to highest
 	 */
-	if (!(compression_level >= -1 && compression_level <= 9))
+	if (!(compression_level >= -1 && compression_level <= 9)) {
+		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "invalid compression level (outside of -1..9): %d",
 			 compression_level);
+	}
 
 	zs.zalloc = pg_zlib_alloc;
 	zs.zfree = pg_zlib_free;
@@ -82,8 +86,10 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 			window_bits,
 			mem_level,
 			Z_DEFAULT_STRATEGY);
-	if (ret != Z_OK)
+	if (ret != Z_OK) {
+		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR, "error running deflateInit2: %d", ret);
+	}
 
 	// rough estimate for gzip format
 	allocated_size = in_size + (in_size / 1000) + 32 + VARHDRSZ;
@@ -94,6 +100,7 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 	out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 	if (out_buf == NULL) {
 		deflateEnd(&zs);
+		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "not enough memory for buffer of %zu bytes",
 			 allocated_size);
@@ -133,11 +140,12 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 	PG_FREE_IF_COPY(in_varlena, 0);
 
 	if (ret != Z_STREAM_END) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "error during compression: %d", ret);
 	}
 
 	out_varlena = (struct varlena *)out_buf;
-	SET_VARSIZE(out_varlena, allocated_size - zs.avail_out);
+	SET_VARSIZE(out_varlena, current_used);
 
 	PG_RETURN_BYTEA_P(out_varlena);
 }
@@ -227,8 +235,10 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 	zs.avail_in = in_size;
 
 	ret = inflateInit2(&zs, window_bits);
-	if (ret != Z_OK)
+	if (ret != Z_OK) {
+		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR, "error running inflateInit2: %d", ret);
+	}
 
 	// rough estimation to prevent memory overallocation
 	allocated_size = in_size * 5;
@@ -239,6 +249,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 	out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 	if (out_buf == NULL) {
 		inflateEnd(&zs);
+		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "not enough memory for buffer of %zu bytes",
 			 allocated_size);
@@ -263,7 +274,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 				 max_uncompressed_size);
 		}
 
-		if (ret == Z_OK && zs.avail_out == 0) {
+		if ((ret == Z_OK || ret == Z_BUF_ERROR) && zs.avail_out == 0) {
 			// double size of allocation to minimize number of repalloc calls
 			allocated_size += memory_chunk_size;
 			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
@@ -280,17 +291,23 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 
 			zs.next_out = out_buf + current_used;
 			zs.avail_out = allocated_size - current_used;
+
+			// Let's try it one more time
+			if (ret == Z_BUF_ERROR)
+				ret = Z_OK;
 		}
 	} while (ret == Z_OK);
 
 	inflateEnd(&zs);
 	PG_FREE_IF_COPY(in_varlena, 0);
 
-	if (ret != Z_STREAM_END)
+	if (ret != Z_STREAM_END) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "error during decompression: %d", ret);
+	}
 
 	out_varlena = (struct varlena *)out_buf;
-	SET_VARSIZE(out_varlena, allocated_size - zs.avail_out);
+	SET_VARSIZE(out_varlena, current_used);
 
 	PG_RETURN_BYTEA_P(out_varlena);
 }
