@@ -105,9 +105,7 @@ pg_lz4(PG_FUNCTION_ARGS)
 	if (out_buf == NULL) {
 		LZ4F_freeCompressionContext(cCtx);
 		PG_FREE_IF_COPY(in_varlena, 0);
-		elog(ERROR,
-			 "out of memory allocating %zu byte buffer",
-			 max_dst_len + VARHDRSZ);
+		elog(ERROR, "out of memory allocating %zu byte buffer", max_dst_len);
 	}
 	dst_data = VARDATA(out_buf);
 
@@ -149,8 +147,10 @@ pg_lz4(PG_FUNCTION_ARGS)
 	LZ4F_freeCompressionContext(cCtx);
 	PG_FREE_IF_COPY(in_varlena, 0);
 
-	if (LZ4F_isError(ret))
+	if (LZ4F_isError(ret)) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "LZ4F_compressEnd failed: %s", LZ4F_getErrorName(ret));
+	}
 
 	total_written += ret;
 
@@ -225,6 +225,20 @@ pg_unlz4(PG_FUNCTION_ARGS)
 	src_size_left = in_size - src_header_size; // bytes left for processing
 
 	do {
+		if (total_decompressed + VARHDRSZ >= allocated_size) {
+			allocated_size += memory_chunk_size;
+			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
+			if (tmp_buf == NULL) {
+				LZ4F_freeDecompressionContext(dCtx);
+				PG_FREE_IF_COPY(in_varlena, 0);
+				pg_hybrid_free(out_buf);
+				elog(ERROR,
+					 "out of memory during buffer resize to %zu bytes",
+					 allocated_size);
+			}
+			out_buf = tmp_buf;
+		}
+
 		next_dst_size = allocated_size - VARHDRSZ - total_decompressed;
 		next_src_size = src_size_left;
 
@@ -235,6 +249,7 @@ pg_unlz4(PG_FUNCTION_ARGS)
 				in_data + src_read_ptr,
 				&next_src_size,
 				NULL);
+
 		if (LZ4F_isError(ret)) {
 			LZ4F_freeDecompressionContext(dCtx);
 			PG_FREE_IF_COPY(in_varlena, 0);
@@ -248,7 +263,6 @@ pg_unlz4(PG_FUNCTION_ARGS)
 
 		if (max_uncompressed_size >= 0 &&
 			total_decompressed > (size_t)max_uncompressed_size) {
-
 			LZ4F_freeDecompressionContext(dCtx);
 			PG_FREE_IF_COPY(in_varlena, 0);
 			pg_hybrid_free(out_buf);
@@ -256,31 +270,17 @@ pg_unlz4(PG_FUNCTION_ARGS)
 				 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 				 max_uncompressed_size);
 		}
-
-		/*
-		 * ret > 0 shows how many bytes is left for processing
-		 */
-		if (ret > 0 && src_size_left > 0 &&
-			(allocated_size - VARHDRSZ == total_decompressed)) {
-
-			allocated_size += memory_chunk_size;
-
-			tmp_buf = (uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
-			if (tmp_buf == NULL) {
-				LZ4F_freeDecompressionContext(dCtx);
-				PG_FREE_IF_COPY(in_varlena, 0);
-				pg_hybrid_free(out_buf);
-				elog(ERROR,
-					 "out of memory during buffer resize to %zu bytes",
-					 allocated_size);
-			}
-			out_buf = tmp_buf;
-		}
-
 	} while (ret > 0 && src_size_left > 0);
 
 	LZ4F_freeDecompressionContext(dCtx);
 	PG_FREE_IF_COPY(in_varlena, 0);
+
+	if (ret > 0) {
+		pg_hybrid_free(out_buf);
+		elog(ERROR,
+			 "LZ4 decompression failed: truncated stream or missing "
+			 "end-of-frame marker");
+	}
 
 	out_varlena = (struct varlena *)out_buf;
 	SET_VARSIZE(out_varlena, total_decompressed + VARHDRSZ);
