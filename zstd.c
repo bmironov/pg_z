@@ -91,9 +91,7 @@ pg_zstd(PG_FUNCTION_ARGS)
 		ZSTD_freeCCtx(cctx); // Free context to prevent memory leak
 		PG_FREE_IF_COPY(in_varlena, 0);
 		pg_hybrid_free(out_buf);
-		elog(ERROR,
-			 "out of memory allocating %zu byte buffer",
-			 max_dst_size + VARHDRSZ);
+		elog(ERROR, "out of memory allocating %zu byte buffer", max_dst_size);
 	}
 	dst_buf = VARDATA(out_buf);
 
@@ -103,13 +101,20 @@ pg_zstd(PG_FUNCTION_ARGS)
 
 	// Perform multi-threaded compression
 	comp_size = ZSTD_compressCCtx(
-			cctx, dst_buf, max_dst_size, in_data, in_size, compression_level);
+			cctx,
+			dst_buf,
+			max_dst_size - VARHDRSZ,
+			in_data,
+			in_size,
+			compression_level);
 	ZSTD_freeCCtx(cctx);
 	PG_FREE_IF_COPY(in_varlena, 0);
 
 	// Check for runtime errors
-	if (ZSTD_isError(comp_size))
+	if (ZSTD_isError(comp_size)) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "compression error: %s", ZSTD_getErrorName(comp_size));
+	}
 
 	out_varlena = (struct varlena *)out_buf;
 	SET_VARSIZE(out_varlena, comp_size + VARHDRSZ);
@@ -170,24 +175,28 @@ pg_unzstd(PG_FUNCTION_ARGS)
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "out of memory allocating %zu byte buffer",
-			 (size_t)uncompressed_size + VARHDRSZ);
+			 (size_t)uncompressed_size);
 	}
 	dst_buf = VARDATA(out_buf);
 
 	// Decompress frame
-	uncomp_size =
-			ZSTD_decompress(dst_buf, uncompressed_size, in_data, in_size);
+	uncomp_size = ZSTD_decompress(
+			dst_buf, uncompressed_size - VARHDRSZ, in_data, in_size);
 
 	ZSTD_freeDCtx(dctx);
 	PG_FREE_IF_COPY(in_varlena, 0);
 
-	if (max_uncompressed_size >= 0 && uncomp_size > max_uncompressed_size)
+	if (max_uncompressed_size >= 0 && uncomp_size > max_uncompressed_size) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR,
 			 "decompressed output exceeds pg_z.max_size (%zu bytes)",
 			 max_uncompressed_size);
+	}
 
-	if (ZSTD_isError(uncomp_size))
+	if (ZSTD_isError(uncomp_size)) {
+		pg_hybrid_free(out_buf);
 		elog(ERROR, "decompression error: %s", ZSTD_getErrorName(uncomp_size));
+	}
 
 	out_varlena = (struct varlena *)out_buf;
 	SET_VARSIZE(out_varlena, uncomp_size + VARHDRSZ);
