@@ -1,0 +1,94 @@
+CREATE EXTENSION IF NOT EXISTS pg_z;
+-- snappy function tests
+SELECT snappy(NULL) AS snappy_null;
+ snappy_null 
+-------------
+ 
+(1 row)
+
+SELECT snappy('') AS snappy_blank;
+ snappy_blank 
+--------------
+ \x
+(1 row)
+
+SELECT snappy('\x00'::bytea) AS snappy_zero;
+               snappy_zero                
+------------------------------------------
+ \xff060000734e6150705901050000d28f254900
+(1 row)
+
+SELECT snappy('The quick brown fox jumps over the lazy dog') AS snappy_default;
+                                                        snappy_default                                                        
+------------------------------------------------------------------------------------------------------------------------------
+ \xff060000734e61507059012f00009c2f8baa54686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67
+(1 row)
+
+SELECT snappy('The quick brown fox jumps over the lazy dog'::bytea) AS snappy_default;
+                                                        snappy_default                                                        
+------------------------------------------------------------------------------------------------------------------------------
+ \xff060000734e61507059012f00009c2f8baa54686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67
+(1 row)
+
+SELECT snappy('The quick brown fox jumps over the lazy dog'::text) AS snappy_default;
+                                                        snappy_default                                                        
+------------------------------------------------------------------------------------------------------------------------------
+ \xff060000734e61507059012f00009c2f8baa54686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67
+(1 row)
+
+WITH str AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', 10000) AS str
+)
+SELECT convert_from(unsnappy(snappy(str)), 'utf8') = str AS unsnappy_long FROM str;
+ unsnappy_long 
+---------------
+ t
+(1 row)
+
+WITH strs AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', generate_series(1, 1000)) AS str
+)
+SELECT sum((str = convert_from(unsnappy(snappy(str)), 'utf8'))::integer) AS unsnappy_strings
+FROM strs;
+ unsnappy_strings 
+------------------
+             1000
+(1 row)
+
+-- unsnappy function tests
+SELECT convert_from(unsnappy(snappy('The quick brown fox jumps over the lazy dog')), 'utf8') AS unsnappy_ok;
+                 unsnappy_ok                 
+---------------------------------------------
+ The quick brown fox jumps over the lazy dog
+(1 row)
+
+SELECT unsnappy(''::bytea) AS unsnappy_blank;
+ unsnappy_blank 
+----------------
+ \x
+(1 row)
+
+SELECT unsnappy('\x00'::bytea) AS unsnappy_8;
+ERROR:  Snappy decompression failed: malformed chunk header
+SELECT unsnappy('\x0000'::bytea) AS unsnappy_16;
+ERROR:  Snappy decompression failed: malformed chunk header
+SELECT unsnappy('fubar'::bytea) AS unsnappy_16;
+ERROR:  Snappy decompression failed: chunk length out of bounds
+SELECT unsnappy(snappy('\x00000000000000000000'::bytea)) AS snappy_roundtrip_zero;
+ snappy_roundtrip_zero  
+------------------------
+ \x00000000000000000000
+(1 row)
+
+-- check limit set by DB parameter
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = 1000;
+SELECT unsnappy(snappy(repeat('?', 1100)::bytea)) AS unsnappy_overlimit;
+ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+RESET pg_z.max_size;
+DROP EXTENSION pg_z;

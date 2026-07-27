@@ -29,7 +29,7 @@ CREATE TABLE pg_z_tests (
 DO $$
 DECLARE
     v_algo TEXT;
-    v_list TEXT[] := ARRAY['brotli', 'deflate', 'gzip', 'lz4', 'zstd', 'zstd-mt'];
+    v_list TEXT[] := ARRAY['brotli', 'deflate', 'gzip', 'lz4', 'snappy', 'zstd', 'zstd-mt'];
 BEGIN
     FOREACH v_algo IN ARRAY v_list LOOP
         -- Case 1: Small payload (frequently handles inline raw text, under 2KB)
@@ -90,6 +90,12 @@ SET
     compressed_payload = lz4(original_text, 5),
     decompressed_text = convert_from(unlz4(lz4(original_text, 5)), 'UTF8')
 WHERE algorithm = 'lz4';
+
+UPDATE pg_z_tests
+SET
+    compressed_payload = snappy(original_text),
+    decompressed_text = convert_from(unsnappy(snappy(original_text)), 'UTF8')
+WHERE algorithm = 'snappy';
 
 UPDATE pg_z_tests
 SET

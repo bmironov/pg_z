@@ -87,6 +87,15 @@ Datum pg_unlz4(PG_FUNCTION_ARGS);
 
 /*
  * ===============================================================
+ * Snappy-related variables and functions
+ * ===============================================================
+ */
+
+Datum pg_snappy(PG_FUNCTION_ARGS);
+Datum pg_unsnappy(PG_FUNCTION_ARGS);
+
+/*
+ * ===============================================================
  * Zstandard-related variables and functions
  * ===============================================================
  */

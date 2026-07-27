@@ -36,6 +36,15 @@
         + [`unlz4` Description](#unlz4-description)
         + [`unlz4` Usage Notes](#unlz4-usage-notes)
         + [`unlz4` Examples](#unlz4-examples)
+- [Snappy Algorithms](#snappy-algorithms)
+    * [`snappy`](#snappy)
+        + [`snappy` Description](#snappy-description)
+        + [`snappy` Usage Notes](#snappy-usage-notes)
+        + [`snappy` Examples](#snappy-examples)
+    * [`unsnappy`](#unsnappy)
+        + [`unsnappy` Description](#unsnappy-description)
+        + [`unsnappy` Usage Notes](#unsnappy-usage-notes)
+        + [`unsnappy` Examples](#unsnappy-examples)
 - [Zstandard Algorithm (zstd)](#zstandard-algorithm-zstd)
     * [Zstandard Important Execution Safety Note](#zstandard-important-execution-safety-note)
     * [`zstd`](#zstd)
@@ -318,6 +327,78 @@ matching `lz4()` implementation functions.
 
 ```sql
 SELECT convert_from(unlz4(lz4('hello world')), 'UTF8');
+-- Result: hello world
+```
+
+***
+
+## Snappy Algorithms
+
+The Snappy compression algorithm is designed for maximum compression and
+decompression speeds with reasonable compression ratios. It is highly efficient
+and optimized for streaming data infrastructures.
+
+All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
+
+### `snappy`
+
+```text
+snappy ( uncompressed bytea ) → bytea
+
+snappy ( uncompressed text ) → bytea
+```
+
+#### `snappy` Description
+
+Compresses input raw bytes (`bytea`) or text (`text`) into the official Snappy
+Framing Format using a safe chunk-by-chunk streaming pipeline.
+
+#### `snappy` Usage Notes
+
+The Snappy algorithm intentionally trades compression ratio for pure execution
+speed. It does not accept a compression level parameter and operates in a
+single, hardware-optimized mode.
+
+- Processes data in independent chunks up to 64KB.
+- Automatically generates mandatory stream identifiers and CRC32C checksums.
+- Transparently falls back to uncompressed data chunks if a specific data
+  block cannot be compressed efficiently, avoiding needless CPU overhead.
+
+#### `snappy` Examples
+
+```sql
+SELECT snappy('hello world');
+-- Result: \xff060000734e61507059010f0000007ed86d68656c6c6f20776f726c64
+```
+
+***
+
+### `unsnappy`
+
+```text
+unsnappy ( compressed bytea ) → bytea
+```
+
+#### `unsnappy` Description
+
+Decompresses a Snappy-framed binary stream back into its original raw bytes
+layout.
+
+#### `unsnappy` Usage Notes
+
+The function processes incoming data stream-by-stream using true zero-copy
+memory allocation.
+
+- Safely accommodates custom framing chunks ranging up to 16MB in size.
+- Parses stream boundaries dynamically, preventing out-of-memory errors on
+  large datasets.
+- Guarantees instant protection against compression bomb vectors by verifying
+  chunk lengths before expanding the output buffer.
+
+#### `unsnappy` Examples
+
+```sql
+SELECT convert_from(unsnappy(snappy('hello world')), 'UTF8');
 -- Result: hello world
 ```
 

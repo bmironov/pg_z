@@ -25,12 +25,14 @@ AC_CHECK_REQUIRED_LIB([brotlienc], [BrotliEncoderCreateInstance], [libbrotli])
 AC_CHECK_REQUIRED_LIB([brotlidec], [BrotliDecoderCreateInstance], [libbrotli])
 AC_CHECK_REQUIRED_LIB([z], [deflate], [zlib])
 AC_CHECK_REQUIRED_LIB([lz4], [LZ4_compress_default], [liblz4])
+AC_CHECK_REQUIRED_LIB([snappy], [snappy_compress], [libsnappy])
 AC_CHECK_REQUIRED_LIB([zstd], [ZSTD_compress], [libzstd])
 
 
 SUPPORT_BROTLI="-- "
 SUPPORT_ZLIB="-- "
 SUPPORT_LZ4="-- "
+SUPPORT_SNAPPY="-- "
 SUPPORT_ZSTD="-- "
 
 case "$DYNAMIC_LIBS" in
@@ -46,6 +48,10 @@ case "$DYNAMIC_LIBS" in
 esac
 
 case "$DYNAMIC_LIBS" in
+    *-lsnappy*) SUPPORT_SNAPPY="" ;;
+esac
+
+case "$DYNAMIC_LIBS" in
     *-lzstd*)   SUPPORT_ZSTD="" ;;
 esac
 
@@ -55,6 +61,7 @@ AC_SUBST(DYNAMIC_LIBS)
 AC_SUBST(SUPPORT_BROTLI)
 AC_SUBST(SUPPORT_ZLIB)
 AC_SUBST(SUPPORT_LZ4)
+AC_SUBST(SUPPORT_SNAPPY)
 AC_SUBST(SUPPORT_ZSTD)
 
 CONFIGURE_RUN="yes"
@@ -62,4 +69,3 @@ AC_SUBST(CONFIGURE_RUN)
 
 AC_CONFIG_FILES([Makefile.port pg_z--1.0.sql])
 AC_OUTPUT
-

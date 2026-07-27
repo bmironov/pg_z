@@ -43,6 +43,7 @@ to be installed on the system to compile into a `.so` file:
 - `brotli` (to support `brotli`);
 - `zlib` (to support the `gzip` and `deflate` algorithms);
 - `lz4` (to support `LZ4`);
+- `snappy` (to support `Snappy`);
 - `zstd` (to support `Zstandard`).
 
 Once all required libraries and their development headers are installed, run
@@ -125,6 +126,9 @@ compression algorithms:
 - LZ4
   - lz4
   - unlz4
+- Snappy
+  - snappy
+  - unsnappy
 - Zstandard
   - zstd
   - unzstd
@@ -203,14 +207,15 @@ In case of successful unit test run, output should look similar this:
 ```text
 # +++ regress install-check in  +++
 # using postmaster on Unix socket, default port
-ok 1         - brotli                                     45 ms
-ok 2         - gzip                                       66 ms
-ok 3         - deflate                                    62 ms
-ok 4         - lz4                                        25 ms
-ok 5         - zstd                                       36 ms
-ok 6         - db_params                                  11 ms
-1..6
-# All 6 tests passed.
+ok 1         - brotli                                     48 ms
+ok 2         - gzip                                       69 ms
+ok 3         - deflate                                    58 ms
+ok 4         - lz4                                        23 ms
+ok 5         - snappy                                    231 ms
+ok 6         - zstd                                       37 ms
+ok 7         - db_params                                  10 ms
+1..7
+# All 7 tests passed.
 ```
 
 Since the tests are similar in nature, the difference in execution time between
@@ -255,9 +260,9 @@ leverage custom allocators tied directly into the PostgreSQL memory manager.
 This architecture prevents memory leaks and enables specialized allocation
 optimizations.
 
-As a result, `brotli`, `gzip` and `lz4` functions are safely marked as
-**`PARALLEL SAFE`**. However, because `zstd` manages its own internal threads
-outside of PostgreSQL's control, `zstd`-related functions are marked as
+As a result, `brotli`, `gzip`, `lz4` and `snappy` functions are safely marked
+as **`PARALLEL SAFE`**. However, because `zstd` manages its own internal
+threads outside of PostgreSQL's control, `zstd`-related functions are marked as
 **`PARALLEL UNSAFE`**.
 
 ### Static Huge Pages Support
