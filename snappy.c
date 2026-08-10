@@ -1,11 +1,13 @@
 #include "pg_z.h"
 
+#include "port/pg_crc32c.h"
 #include <snappy-c.h>
 
 PG_FUNCTION_INFO_V1(pg_snappy);
 PG_FUNCTION_INFO_V1(pg_unsnappy);
 
 // Constants according to the official Snappy Framing Format Specification
+
 #define SNAPPY_CHUNK_SIZE 65536
 #define CHUNK_STREAM_IDENTIFIER 0xff
 #define CHUNK_COMPRESSED_DATA 0x00
@@ -19,24 +21,15 @@ static const uint8_t SNAPPY_MAGIC[] = {0x73, 0x4e, 0x61, 0x50, 0x70, 0x59};
  * Per Snappy spec, CRC is masked as: ((crc >> 15) | (crc << 17)) + 0xa282ead8
  */
 static inline uint32_t
-snappy_crc32c(const uint8_t *data, size_t length)
+snappy_crc32c(const uint8_t *restrict data, size_t length)
 {
-	uint32_t crc = 0xffffffff;
-	size_t i;
-	int j;
+	pg_crc32c crc;
 
-	for (i = 0; i < length; i++) {
-		crc ^= data[i];
-		for (j = 0; j < 8; j++) {
-			if (crc & 1)
-				crc = (crc >> 1) ^ 0x82F63B78; /* Castagnoli polynomial */
-			else
-				crc >>= 1;
-		}
-	}
-	crc ^= 0xffffffff;
+	INIT_CRC32C(crc);
+	COMP_CRC32C(crc, data, length);
+	FIN_CRC32C(crc);
 
-	/* Masking according to the Snappy specification */
+	// Apply Snappy's specific masking as per the specification
 	return ((crc >> 15) | (crc << 17)) + 0xa282ead8;
 }
 
@@ -161,7 +154,10 @@ pg_snappy(PG_FUNCTION_ARGS)
 		out_buf[chunk_header_pos++] =
 				(uint8_t)((total_chunk_len >> 16) & 0xff);
 
-		memcpy(out_buf + chunk_header_pos, &masked_crc, 4);
+		out_buf[chunk_header_pos++] = (uint8_t)(masked_crc & 0xff);
+		out_buf[chunk_header_pos++] = (uint8_t)((masked_crc >> 8) & 0xff);
+		out_buf[chunk_header_pos++] = (uint8_t)((masked_crc >> 16) & 0xff);
+		out_buf[chunk_header_pos++] = (uint8_t)((masked_crc >> 24) & 0xff);
 
 		out_offset += max_comp_len;
 		src_offset += block_size;
@@ -325,17 +321,18 @@ pg_unsnappy(PG_FUNCTION_ARGS)
 					   data_len);
 				out_offset += data_len;
 			} else {
+				size_t working_len = uncompressed_chunk_len;
 				snappy_status decompress_status = snappy_uncompress(
 						(const char *)(in_data + src_offset),
 						data_len,
 						(char *)(out_buf + VARHDRSZ + out_offset),
-						&uncompressed_chunk_len);
+						&working_len);
 				if (decompress_status != SNAPPY_OK) {
 					pg_hybrid_free(out_buf);
 					PG_FREE_IF_COPY(in_varlena, 0);
 					elog(ERROR, "Snappy chunk decompression failed");
 				}
-				out_offset += uncompressed_chunk_len;
+				out_offset += working_len;
 			}
 			src_offset += data_len;
 		} else {

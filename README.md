@@ -202,16 +202,16 @@ make installcheck
 Last command will execute the `.sql` scripts from the `sql` directory defined
 via the `REGRESS` variable in the `Makefile`. Then, it will compare their
 output with the corresponding samples (`.out` files in the `expected` directory).
-In case of successful unit test run, output should look similar this:
+In case of successful unit test run, output should look similar to this:
 
 ```text
 # +++ regress install-check in  +++
 # using postmaster on Unix socket, default port
 ok 1         - brotli                                     48 ms
-ok 2         - gzip                                       69 ms
+ok 2         - gzip                                       66 ms
 ok 3         - deflate                                    58 ms
 ok 4         - lz4                                        23 ms
-ok 5         - snappy                                    231 ms
+ok 5         - snappy                                     22 ms
 ok 6         - zstd                                       37 ms
 ok 7         - db_params                                  10 ms
 1..7

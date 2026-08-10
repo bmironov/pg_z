@@ -33,6 +33,11 @@ OBJS = $(addsuffix .o, $(SRC_MODULES))
 
 ifdef DEBUG
     PG_CFLAGS += -g3 -O0
+else
+	# O3 - maximum optimization
+	# march=native - to use hardware acceleration where possible
+	# For example, Snappy uses CRC32C
+	PG_CFLAGS += -O3 -march=native
 endif
 
 PG_CONFIG = pg_config
