@@ -37,29 +37,53 @@ at the cost of slightly higher CPU usage during compression.
 
 ## Requirements for the `pg_z` Extension
 
-The `pg_z` extension requires several libraries and their development headers
-to be installed on the system to compile into a `.so` file:
+The `pg_z` extension compiles into a hybrid-linked `.so` file. To support
+the full set of compression algorithms, the following libraries and their
+development headers should be installed on the build system:
 
-- `brotli` (to support `brotli`);
-- `zlib` (to support the `gzip` and `deflate` algorithms);
-- `lz4` (to support `LZ4`);
-- `snappy` (to support `Snappy`);
-- `zstd` (to support `Zstandard`).
+- `brotli` (for `brotli` algorithms, linked statically by default);
+- `zlib` (for `gzip` and `deflate` algorithms, linked dynamically);
+- `lz4` (for `LZ4` algorithm, linked statically by default);
+- `snappy` (for `Snappy` algorithm, linked dynamically);
+- `zstd` (for `Zstandard` algorithm, linked statically by default).
 
-Once all required libraries and their development headers are installed, run
-the following commands to generate the build scripts and configure the
-extension:
+All libraries are completely optional. The `./configure` script automatically
+detects what is available in the system and gracefully disables missing
+components without failing the build. The generated `pg_z--*.sql` file will
+declare only the SQL functions for the algorithms supported by your system.
+
+To automatically detect the available libraries and generate the required
+build infrastructure scripts, run:
 
 ```bash
 autoreconf -if
 ./configure
 ```
 
-Linking is done dynamically, so these libraries must be installed on every
-system where the extension runs. Running `./configure` will automatically
-detect the available libraries and generate the corresponding `pg_z--*.sql`
-file, ensuring that the subsequent `CREATE EXTENSION` command declares only
-the functions supported by your system.
+Heavy libraries (`brotli`, `lz4`, `zstd`) are embedded directly into the
+`pg_z.so` binary, ensuring portability. However, `zlib` and `snappy` are
+linked dynamically, meaning their standard runtime packages must be present
+on every target system where the extension runs.
+
+If necessary, you can alter the variables at the beginning of `configure.ac`
+to force dynamic linking for all algorithms instead of static. Please note
+that in Debian/Ubuntu distributions, `zlib` and `snappy` cannot be linked
+statically out of the box. Debian supplies `libz.a` compiled without the
+`-fPIC` flag, which breaks shared library creation, while `libsnappy.a` is
+a C++ library that lacks a static C-wrapper archive in standard repositories.
+
+If you strictly require a fully static binary with zero external runtime
+dependencies and want to minimize the final size of `pg_z.so`, you can
+manually compile custom versions of these dependencies from their official
+sources. Ensuring they are built with the `CFLAGS="-O3 -fPIC -flto"` flag will
+allow the compiler to perform dead code elimination and seamlessly embed
+them during static linking.
+
+For deployments that demand maximum throughput for `gzip` and `deflate`, consider
+using [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of stock `zlib`.
+Compiling `zlib-ng` from source with the `-fPIC -flto` flags in its native
+`zlib-compat` mode allows you to link it statically into `pg_z.so`, unlocking
+next-generation hardware-accelerated performance.
 
 If you want to install this extension as an "Extension Image" for the
 CloudNativePG (`cnpg`) operator for Kubernetes, please refer to the provided
@@ -211,9 +235,9 @@ ok 1         - brotli                                     48 ms
 ok 2         - gzip                                       66 ms
 ok 3         - deflate                                    58 ms
 ok 4         - lz4                                        23 ms
-ok 5         - snappy                                     22 ms
-ok 6         - zstd                                       37 ms
-ok 7         - db_params                                  10 ms
+ok 5         - snappy                                     21 ms
+ok 6         - zstd                                       35 ms
+ok 7         - db_params                                   9 ms
 1..7
 # All 7 tests passed.
 ```

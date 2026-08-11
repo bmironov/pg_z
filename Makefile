@@ -11,39 +11,25 @@ REGRESS = brotli gzip deflate lz4 snappy zstd db_params
 ifeq ($(filter $(BUILD_DIR),$(notdir $(CURDIR))),)
 
 all:
-	@cd $(BUILD_DIR) && $(MAKE) -f ../Makefile VPATH=..
+	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=..
 
 debug:
-	@cd $(BUILD_DIR) && $(MAKE) -f ../Makefile VPATH=.. DEBUG=1
+	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. DEBUG_BUILD=1
 
 install:
-	@cd $(BUILD_DIR) && $(MAKE) -f ../Makefile VPATH=.. install
+	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. install
 
 installcheck:
-	@cd $(BUILD_DIR) && $(MAKE) -f ../Makefile VPATH=.. installcheck
+	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. installcheck
 
 clean: clean-artifacts
-	@cd $(BUILD_DIR) && $(MAKE) -f ../Makefile VPATH=.. clean
+	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. clean
 
 clean-artifacts:
 	rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/*.bc $(BUILD_DIR)/*.so
 
 else
 OBJS = $(addsuffix .o, $(SRC_MODULES))
-
-ifdef DEBUG
-    PG_CFLAGS += -g3 -O0
-else
-	# O3 - maximum optimization
-	# march=native - to use hardware acceleration where possible
-	# For example, Snappy uses CRC32C
-	PG_CFLAGS += -O3 -march=native
-endif
-
-PG_CONFIG = pg_config
-PGXS := $(shell $(PG_CONFIG) --pgxs)
-include $(PGXS)
-
 
 -include ../Makefile.port
 
@@ -52,5 +38,35 @@ ifndef CONFIGURE_RUN
 $(error Please run ./configure before running make)
 endif
 
-SHLIB_LINK += $(DYNAMIC_LIBS)
+
+ifdef DEBUG_BUILD
+	PG_CFLAGS += -g3 -O0
+	STRIP_CMD = :
+else
+	# O3 - maximum optimization
+	# march=native - to use hardware acceleration where possible
+	# For example, Snappy uses HW-accelerated CRC32C
+	#
+	# lto - Link-Time Optimization
+	PG_CFLAGS += -march=native -flto
+	SHLIB_LINK += -flto
+	STRIP_CMD = strip --strip-unneeded $(shlib)
+endif
+
+PG_LDFLAGS += -L/usr/lib/x86_64-linux-gnu
+SHLIB_LINK += -Wl,-Bstatic  -Wl,--start-group $(STATIC_LIBS) -Wl,--end-group \
+			  -Wl,-Bdynamic $(DYNAMIC_LIBS)
+
+PG_CONFIG = pg_config
+PGXS := $(shell $(PG_CONFIG) --pgxs)
+include $(PGXS)
+
+
+# Strip debug info during "make" or "make debug" only.
+# "make install" just copies what was produced
+ifneq ($(filter install,$(MAKECMDGOALS)),install)
+all: $(shlib)
+	@$(STRIP_CMD)
+endif
+
 endif
