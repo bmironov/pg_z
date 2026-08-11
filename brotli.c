@@ -50,8 +50,7 @@ pg_brotli(PG_FUNCTION_ARGS)
 	size_t available_in = 0, available_out = 0;
 	const uint8 *next_in = NULL;
 
-	if (max_uncompressed_size >= 0 &&
-		in_size > (size_t)max_uncompressed_size) {
+	if (in_size > max_uncompressed_size) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "input data is limited by pg_z.max_size (%zu bytes)",
@@ -244,8 +243,7 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 				   decompressed_bytes);
 			out_offset += decompressed_bytes;
 
-			if (max_uncompressed_size >= 0 &&
-				out_offset > (size_t)max_uncompressed_size) {
+			if (out_offset > max_uncompressed_size) {
 				BrotliDecoderDestroyInstance(state);
 				PG_FREE_IF_COPY(in_varlena, 0);
 				pg_hybrid_free(out_buf);

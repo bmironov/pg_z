@@ -23,14 +23,8 @@ assign_memory_chunk_size(int newval, void *extra)
 static void
 assign_max_uncompressed_size(int newval, void *extra)
 {
-	if (newval > 8 * 1024) {
-		// round up to closest 8kB mulltiple
-		guc_max_uncompressed_size =
-				(newval + (8 * 1024 - 1)) & ~(8 * 1024 - 1);
-	} else {
-		guc_max_uncompressed_size = newval;
-	}
-
+	// round up to closest 8kB mulltiple
+	guc_max_uncompressed_size = (newval + (8 * 1024 - 1)) & ~(8 * 1024 - 1);
 	max_uncompressed_size = (size_t)guc_max_uncompressed_size;
 }
 
@@ -43,9 +37,9 @@ _PG_init(void)
 			"Memory allocation chunk size, in bytes. ",
 			NULL,
 			&guc_memory_chunk_size,
-			256 * 1024, /* default: 256kB */
-			8 * 1024,	/* min: 8kB */
-			INT_MAX,
+			256 * 1024, // default: 256kB
+			8 * 1024,	// min: 8kB
+			MaxAllocSize,
 			PGC_USERSET,
 			GUC_UNIT_BYTE,
 			NULL,
@@ -57,12 +51,12 @@ _PG_init(void)
 	DefineCustomIntVariable(
 			"pg_z.max_size",
 			"Maximum allowed uncompressed document size, in bytes. "
-			"-1 disables the limit.",
+			"0 will disable processing of any data.",
 			NULL,
 			&guc_max_uncompressed_size,
-			256 * 1024 * 1024, /* default: 256MB */
-			-1,				   /* min: -1 = unlimited */
-			INT_MAX,
+			256 * 1024 * 1024, // default: 256MB
+			0,				   // min: 0 = unlimited
+			MaxAllocSize,	   // PostgreSQL won't accept more data
 			PGC_USERSET,
 			GUC_UNIT_BYTE,
 			NULL,

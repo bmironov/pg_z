@@ -119,7 +119,8 @@ For decompression functions, processing will begin, but if the decompressed
 data size exceeds the limit at any point, execution will abort and any
 partially decompressed data will be discarded.
 
-To disable the uncompressed data size limit check, set `pg_z.max_size = -1`.
+You can set this parameter to `pg_z.max_size = 0` to basically disable the
+functionality of this extension.
 
 ### `pg_z.mem_chunk_size`
 

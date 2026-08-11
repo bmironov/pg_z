@@ -59,8 +59,7 @@ pg_snappy(PG_FUNCTION_ARGS)
 		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
-	if (max_uncompressed_size >= 0 &&
-		in_size > (size_t)max_uncompressed_size) {
+	if (in_size > max_uncompressed_size) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "input data is limited by pg_z.max_size (%zu bytes)",
@@ -305,9 +304,7 @@ pg_unsnappy(PG_FUNCTION_ARGS)
 				out_buf = tmp_buf;
 			}
 
-			if (max_uncompressed_size >= 0 &&
-				out_offset + uncompressed_chunk_len >
-						(size_t)max_uncompressed_size) {
+			if (out_offset + uncompressed_chunk_len > max_uncompressed_size) {
 				pg_hybrid_free(out_buf);
 				PG_FREE_IF_COPY(in_varlena, 0);
 				elog(ERROR,

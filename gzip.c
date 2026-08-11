@@ -55,7 +55,7 @@ pg_any_gzip(PG_FUNCTION_ARGS)
 		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
-	if (max_uncompressed_size >= 0 && in_size > max_uncompressed_size) {
+	if (in_size > max_uncompressed_size) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "input data is limited by pg_z.max_size (%zu bytes)",
@@ -262,9 +262,7 @@ pg_any_gunzip(PG_FUNCTION_ARGS)
 		ret = inflate(&zs, Z_NO_FLUSH);
 		current_used = allocated_size - zs.avail_out;
 
-		if (max_uncompressed_size >= 0 &&
-			(current_used - VARHDRSZ) > (size_t)max_uncompressed_size) {
-
+		if ((current_used - VARHDRSZ) > max_uncompressed_size) {
 			inflateEnd(&zs);
 			PG_FREE_IF_COPY(in_varlena, 0);
 			pg_hybrid_free(out_buf);

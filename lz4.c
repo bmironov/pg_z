@@ -62,8 +62,7 @@ pg_lz4(PG_FUNCTION_ARGS)
 		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
-	if (max_uncompressed_size >= 0 &&
-		in_size > (size_t)max_uncompressed_size) {
+	if (in_size > max_uncompressed_size) {
 		PG_FREE_IF_COPY(in_varlena, 0);
 		elog(ERROR,
 			 "input data is limited by pg_z.max_size (%zu bytes)",
@@ -261,8 +260,7 @@ pg_unlz4(PG_FUNCTION_ARGS)
 		src_read_ptr += next_src_size;
 		src_size_left -= next_src_size;
 
-		if (max_uncompressed_size >= 0 &&
-			total_decompressed > (size_t)max_uncompressed_size) {
+		if (total_decompressed > max_uncompressed_size) {
 			LZ4F_freeDecompressionContext(dCtx);
 			PG_FREE_IF_COPY(in_varlena, 0);
 			pg_hybrid_free(out_buf);
