@@ -144,14 +144,14 @@ algorithms.
 The table below categorizes all available functions by their underlying
 compression algorithms, arranged in alphabetical order:
 
-| Algorithm | Compression Function | Decompression Function  |
+| Algorithm | Compression Function | Decompression Function |
 | :-------- | :------------------- | :---------------------- |
-| Brotli    | `brotli`             | `unbrotli`              |
-| deflate   | `deflate`            | `inflate`               |
-| Gzip      | `gzip`               | `gunzip` (aka `ungzip`) |
-| LZ4       | `lz4`                | `unlz4`                 |
-| Snappy    | `snappy`             | `unsnappy`              |
-| Zstandard | `zstd`               | `unzstd`                |
+| [Brotli][7] | `brotli` | `unbrotli` |
+| [deflate][8] | `deflate` | `inflate` |
+| [Gzip][8] | `gzip` | `gunzip` (aka `ungzip`) |
+| [LZ4][9] | `lz4` | `unlz4` |
+| [Snappy][10] | `snappy` | `unsnappy` |
+| [Zstandard][11] | `zstd` | `unzstd` |
 
 Detailed definitions and usage examples for these functions can be found in
 [USAGE.md][4].
@@ -350,3 +350,8 @@ a universal reference to compression as in `.Z` file type.
 [4]: USAGE.md
 [5]: DATA_FLOW.md
 [6]: MEMORY_MANAGER.md
+[7]: https://github.com/google/brotli
+[8]: https://www.gnu.org/software/gzip/
+[9]: https://github.com/lz4/lz4
+[10]: https://github.com/google/snappy
+[11]: https://github.com/facebook/zstd
