@@ -136,28 +136,22 @@ equal to the maximum size of `TEXT` or `BYTEA`
 
 ## Functions Provided by This Extension
 
-The `pg_z` extension provides several functions for working with compressed
-data. These functions are categorized into groups based on their underlying
-compression algorithms:
+The `pg_z` extension provides a comprehensive set of functions for working
+with compressed data. All of these functions operate entirely in userspace,
+allowing you to compress and decompress data on the fly using standard
+algorithms.
 
-- Brotli
-  - brotli
-  - unbrotli
-- gzip
-  - gzip
-  - gunzip (aka ungzip)
-- deflate
-  - deflate
-  - inflate
-- LZ4
-  - lz4
-  - unlz4
-- Snappy
-  - snappy
-  - unsnappy
-- Zstandard
-  - zstd
-  - unzstd
+The table below categorizes all available functions by their underlying
+compression algorithms, arranged in alphabetical order:
+
+| Algorithm | Compression Function | Decompression Function  |
+| :-------- | :------------------- | :---------------------- |
+| Brotli    | `brotli`             | `unbrotli`              |
+| deflate   | `deflate`            | `inflate`               |
+| Gzip      | `gzip`               | `gunzip` (aka `ungzip`) |
+| LZ4       | `lz4`                | `unlz4`                 |
+| Snappy    | `snappy`             | `unsnappy`              |
+| Zstandard | `zstd`               | `unzstd`                |
 
 Detailed definitions and usage examples for these functions can be found in
 [USAGE.md][4].
