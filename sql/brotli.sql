@@ -42,6 +42,7 @@ SELECT unbrotli(brotli('The quick brown fox jumps over the lazy dog'::bytea, 100
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
 SET pg_z.max_size = 1000;
+SELECT brotli(repeat('?', 1100)::bytea) AS unbrotli_overlimit;
 SELECT unbrotli(brotli(repeat('?', 1100)::bytea)) AS unbrotli_overlimit;
 RESET pg_z.max_size;
 

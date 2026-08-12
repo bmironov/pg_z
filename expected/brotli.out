@@ -103,6 +103,8 @@ SHOW pg_z.max_size;
 (1 row)
 
 SET pg_z.max_size = 1000;
+SELECT brotli(repeat('?', 1100)::bytea) AS unbrotli_overlimit;
+ERROR:  input data is limited by pg_z.max_size (1000 bytes)
 SELECT unbrotli(brotli(repeat('?', 1100)::bytea)) AS unbrotli_overlimit;
 ERROR:  input data is limited by pg_z.max_size (1000 bytes)
 RESET pg_z.max_size;
