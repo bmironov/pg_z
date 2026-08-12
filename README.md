@@ -351,7 +351,7 @@ a universal reference to compression as in `.Z` file type.
 [5]: DATA_FLOW.md
 [6]: MEMORY_MANAGER.md
 [7]: https://github.com/google/brotli
-[8]: https://www.gnu.org/software/gzip/
+[8]: https://zlib.net
 [9]: https://github.com/lz4/lz4
 [10]: https://github.com/google/snappy
 [11]: https://github.com/facebook/zstd

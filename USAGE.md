@@ -2,7 +2,7 @@
 
 <!-- toc -->
 
-- [Brotli Algorithms](#brotli-algorithms)
+- [Brotli Algorithm](#brotli-algorithm)
     * [`brotli`](#brotli)
         + [`brotli` Description](#brotli-description)
         + [`brotli` Usage Notes](#brotli-usage-notes)
@@ -60,17 +60,18 @@
 
 The `pg_z` extension provides a collection of functions to compress and
 decompress data within PostgreSQL using standard industry algorithms:
-Gzip/Deflate (zlib), LZ4, and Zstandard (zstd).
+[Brotli][1], [Gzip][2]/Deflate (zlib), [LZ4][3], [Snappy][4], and
+[Zstandard][5] (zstd).
 
 Compression functions accept both `bytea` and `text` data types. Decompression
 functions strictly take `bytea` inputs and return the raw decompressed `bytea`
 stream.
 
-## Brotli Algorithms
+## Brotli Algorithm
 
-The Brotli compression algorithm (RFC 7932) is highly optimized for text data,
-web content, and JSON payloads. It provides exceptional compression ratios,
-outperforming Gzip and often matching or exceeding Zstandard on highly
+The [Brotli][1] compression algorithm (RFC 7932) is highly optimized for text
+data, web content, and JSON payloads. It provides exceptional compression
+ratios, outperforming Gzip and often matching or exceeding Zstandard on highly
 repetitive string patterns.
 
 All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
@@ -136,7 +137,7 @@ SELECT convert_from(unbrotli(brotli('hello world')), 'UTF8');
 
 ## Gzip and Deflate Algorithms (zlib)
 
-These functions utilize the standard `zlib` library. `deflate` processes raw
+These functions utilize the standard [`zlib`][2] library. `deflate` processes raw
 compressed streams, while `gzip` wraps the compressed data inside a standard
 gzip file structure wrapper including headers and trailers.
 
@@ -268,7 +269,7 @@ SELECT convert_from(gunzip(gzip('hello world')), 'UTF8');
 
 ## LZ4 Algorithm
 
-The LZ4 functions focus on extremely high compression and decompression speeds,
+The [LZ4][3] functions focus on extremely high compression and decompression speeds,
 trading a slightly lower compression ratio compared to zlib for minimized CPU
 overhead. Data streams comply with the standardized LZ4 frame format
 specifications outlined in RFC 8478.
@@ -334,7 +335,7 @@ SELECT convert_from(unlz4(lz4('hello world')), 'UTF8');
 
 ## Snappy Algorithms
 
-The Snappy compression algorithm is designed for maximum compression and
+The [Snappy][4] compression algorithm is designed for maximum compression and
 decompression speeds with reasonable compression ratios. It is highly efficient
 and optimized for streaming data infrastructures.
 
@@ -406,7 +407,7 @@ SELECT convert_from(unsnappy(snappy('hello world')), 'UTF8');
 
 ## Zstandard Algorithm (zstd)
 
-Zstandard provides real-time compression scenarios with scaling ratios
+[Zstandard][5] provides real-time compression scenarios with scaling ratios
 comparable to the best archive formats, natively specified in RFC 8878.
 
 ### Zstandard Important Execution Safety Note
@@ -472,3 +473,9 @@ terminated with an explicit engine error.
 SELECT convert_from(unzstd(zstd('zstd multi-threaded output', 12, 4)), 'UTF8');
 -- Result: zstd multi-threaded output
 ```
+
+[1]: https://github.com/google/brotli
+[2]: https://zlib.net
+[3]: https://github.com/lz4/lz4
+[4]: https://github.com/google/snappy
+[5]: https://github.com/facebook/zstd
