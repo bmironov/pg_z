@@ -130,8 +130,9 @@ allocated and later released for compression and decompression functions. Using
 this uniform size minimizes memory fragmentation. It is recommended to set this
 value to the most common size of processed documents in the system.
 
-For smaller sizes, the value should be a multiple of 8 KB. If you use static
-Huge Pages, then adjust the value to multiples of the Huge Page size used.
+The provided value is always rounded up to a multiple of 8 KB to minimize
+memory fragmentation. The upper limit for this parameter is `1GB`, which is
+equal to the maximum size of `TEXT` or `BYTEA`
 
 ## Functions Provided by This Extension
 
@@ -139,7 +140,7 @@ The `pg_z` extension provides several functions for working with compressed
 data. These functions are categorized into groups based on their underlying
 compression algorithms:
 
-- brotli
+- Brotli
   - brotli
   - unbrotli
 - gzip

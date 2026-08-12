@@ -8,7 +8,7 @@
 
 size_t huge_page_size; // actual size of Huge Page on the system
 
-#define REGISTRY_PAGE_SIZE 8192 // chunk step
+#define REGISTRY_PAGE_SIZE MEM_8KB // chunk step
 typedef int16 registry_index;
 #define MAX_REGISTRY_INDEX SHRT_MAX // 32767 is max for signed int16
 

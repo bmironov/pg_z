@@ -50,6 +50,9 @@ void pg_mem_tracker_init_hugepage_size(void);
  * Memory manager
  * ===============================================================
  */
+
+#define MEM_8KB 8192
+
 /* Global variable to store the actual default Huge Page size of the OS */
 extern size_t huge_page_size;
 

@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "pg_z.h"
+#include "utils/memutils.h"
 
 PG_MODULE_MAGIC;
 
@@ -15,20 +16,39 @@ static int guc_max_uncompressed_size;
 static void
 assign_memory_chunk_size(int newval, void *extra)
 {
-	// rounding up size to closest 8kB multiple
-	guc_memory_chunk_size = (newval + (8 * 1024 - 1)) & ~(8 * 1024 - 1);
-	memory_chunk_size = (size_t)guc_memory_chunk_size;
+	guc_memory_chunk_size = newval;
+	memory_chunk_size = (size_t)newval;
+}
+
+static bool
+check_memory_chunk_size(int *newval, void **extra, GucSource source)
+{
+	if (*newval < MEM_8KB) {
+		*newval = MEM_8KB;
+	} else {
+		// rounding up size to closest 8kB multiple
+		*newval = (*newval + (MEM_8KB - 1)) & ~(MEM_8KB - 1);
+	}
+
+	return true;
 }
 
 static void
 assign_max_uncompressed_size(int newval, void *extra)
 {
-	// round up to closest 8kB mulltiple
-	guc_max_uncompressed_size = (newval + (8 * 1024 - 1)) & ~(8 * 1024 - 1);
-	max_uncompressed_size = (size_t)guc_max_uncompressed_size;
+	guc_max_uncompressed_size = newval;
+	max_uncompressed_size = (size_t)newval;
 }
 
-void _PG_init(void);
+static bool
+check_max_uncompressed_size(int *newval, void **extra, GucSource source)
+{
+	if (*newval < 0)
+		guc_max_uncompressed_size = 0;
+
+	return true;
+}
+
 void
 _PG_init(void)
 {
@@ -38,15 +58,13 @@ _PG_init(void)
 			NULL,
 			&guc_memory_chunk_size,
 			256 * 1024, // default: 256kB
-			8 * 1024,	// min: 8kB
-			MaxAllocSize,
+			MEM_8KB,	// min: 8kB
+			1024 * 1024 * 1024,
 			PGC_USERSET,
 			GUC_UNIT_BYTE,
-			NULL,
+			check_memory_chunk_size,
 			assign_memory_chunk_size,
 			NULL);
-
-	assign_memory_chunk_size(guc_memory_chunk_size, NULL);
 
 	DefineCustomIntVariable(
 			"pg_z.max_size",
@@ -55,15 +73,13 @@ _PG_init(void)
 			NULL,
 			&guc_max_uncompressed_size,
 			256 * 1024 * 1024, // default: 256MB
-			0,				   // min: 0 = unlimited
+			0,				   // min: 0 = disable any processing
 			MaxAllocSize,	   // PostgreSQL won't accept more data
 			PGC_USERSET,
 			GUC_UNIT_BYTE,
-			NULL,
+			check_max_uncompressed_size,
 			assign_max_uncompressed_size,
 			NULL);
-
-	assign_max_uncompressed_size(guc_max_uncompressed_size, NULL);
 
 	pg_mem_tracker_init_hugepage_size();
 }
