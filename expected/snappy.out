@@ -87,8 +87,10 @@ SHOW pg_z.max_size;
  256MB
 (1 row)
 
-SET pg_z.max_size = 1000;
-SELECT unsnappy(snappy(repeat('?', 1100)::bytea)) AS unsnappy_overlimit;
-ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+SET pg_z.max_size = 10;
+SELECT snappy('The quick brown fox jumps over the lazy dog'::bytea) AS snappy_overlimit;
+ERROR:  input data is limited by pg_z.max_size (10 bytes)
+SELECT convert_from(unsnappy('\xff060000734e61507059012f00009c2f8baa54686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67'::bytea), 'UTF8') AS unsnappy_overlimit;
+ERROR:  decompressed output exceeds pg_z.max_size (10 bytes)
 RESET pg_z.max_size;
 DROP EXTENSION pg_z;

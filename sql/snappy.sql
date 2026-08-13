@@ -31,8 +31,9 @@ SELECT unsnappy(snappy('\x00000000000000000000'::bytea)) AS snappy_roundtrip_zer
 
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
-SET pg_z.max_size = 1000;
-SELECT unsnappy(snappy(repeat('?', 1100)::bytea)) AS unsnappy_overlimit;
+SET pg_z.max_size = 10;
+SELECT snappy('The quick brown fox jumps over the lazy dog'::bytea) AS snappy_overlimit;
+SELECT convert_from(unsnappy('\xff060000734e61507059012f00009c2f8baa54686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67'::bytea), 'UTF8') AS unsnappy_overlimit;
 RESET pg_z.max_size;
 
 

@@ -103,8 +103,10 @@ SHOW pg_z.max_size;
  256MB
 (1 row)
 
-SET pg_z.max_size = 1000;
-SELECT gunzip(gzip(repeat('?', 1100)::bytea)) AS gunzip_overlimit;
-ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+SET pg_z.max_size = 10;
+SELECT gzip('The quick brown fox jumps over the lazy dog') AS gzip_overlimit;
+ERROR:  input data is limited by pg_z.max_size (10 bytes)
+SELECT convert_from(gunzip('\x1f8b08000000000000030bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a7030039a34f412b000000'::bytea), 'UTF8') AS gunzip_overlimit;
+ERROR:  decompressed output exceeds pg_z.max_size (10 bytes)
 RESET pg_z.max_size;
 DROP EXTENSION pg_z;

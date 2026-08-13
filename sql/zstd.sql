@@ -42,8 +42,9 @@ SELECT unzstd(zstd('The quick brown fox jumps over the lazy dog'::bytea, 100)) A
 
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
-SET pg_z.max_size = 1000;
-SELECT unzstd(zstd(repeat('?', 1100)::bytea)) AS unzstd_overlimit;
+SET pg_z.max_size = 10;
+SELECT zstd('The quick brown fox jumps over the lazy dog') AS zstd_overlimit;
+SELECT convert_from(unzstd('\x28b52ffd202b59010054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67'::bytea), 'UTF8') AS unzstd_overlimit;
 RESET pg_z.max_size;
 
 

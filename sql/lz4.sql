@@ -42,8 +42,9 @@ SELECT unlz4(lz4('The quick brown fox jumps over the lazy dog'::bytea, 13)) AS u
 
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
-SET pg_z.max_size = 1000;
-SELECT unlz4(lz4(repeat('?', 1100)::bytea)) AS unlz4_overlimit;
+SET pg_z.max_size = 10;
+SELECT lz4('The quick brown fox jumps over the lazy dog') AS lz4_overlimit;
+SELECT convert_from(unlz4('\x04224d1848702b000000000000002f2b00008054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f6700000000'::bytea), 'UTF8') AS unlz4_overlimit;
 RESET pg_z.max_size;
 
 

@@ -42,8 +42,9 @@ SELECT gunzip(gzip('The quick brown fox jumps over the lazy dog'::bytea, 10)) AS
 
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
-SET pg_z.max_size = 1000;
-SELECT gunzip(gzip(repeat('?', 1100)::bytea)) AS gunzip_overlimit;
+SET pg_z.max_size = 10;
+SELECT gzip('The quick brown fox jumps over the lazy dog') AS gzip_overlimit;
+SELECT convert_from(gunzip('\x1f8b08000000000000030bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a7030039a34f412b000000'::bytea), 'UTF8') AS gunzip_overlimit;
 RESET pg_z.max_size;
 
 

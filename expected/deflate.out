@@ -103,8 +103,10 @@ SHOW pg_z.max_size;
  256MB
 (1 row)
 
-SET pg_z.max_size = 1000;
-SELECT inflate(deflate(repeat('?', 1100)::bytea)) AS deflate_overlimit;
-ERROR:  input data is limited by pg_z.max_size (1000 bytes)
+SET pg_z.max_size = 10;
+SELECT deflate('The quick brown fox jumps over the lazy dog') AS deflate_overlimit;
+ERROR:  input data is limited by pg_z.max_size (10 bytes)
+SELECT convert_from(inflate('\x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a70300'::bytea), 'UTF8') AS inflate_overlimit;
+ERROR:  decompressed output exceeds pg_z.max_size (10 bytes)
 RESET pg_z.max_size;
 DROP EXTENSION pg_z;

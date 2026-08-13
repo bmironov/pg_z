@@ -42,8 +42,9 @@ SELECT inflate(deflate('The quick brown fox jumps over the lazy dog'::bytea, 10)
 
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
-SET pg_z.max_size = 1000;
-SELECT inflate(deflate(repeat('?', 1100)::bytea)) AS deflate_overlimit;
+SET pg_z.max_size = 10;
+SELECT deflate('The quick brown fox jumps over the lazy dog') AS deflate_overlimit;
+SELECT convert_from(inflate('\x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a70300'::bytea), 'UTF8') AS inflate_overlimit;
 RESET pg_z.max_size;
 
 
