@@ -122,20 +122,19 @@ pg_brotli(PG_FUNCTION_ARGS)
 
 	PG_CATCH();
 	{
+		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
 		if (state != NULL)
 			BrotliEncoderDestroyInstance((BrotliEncoderState *)state);
 		if (out_varlena != NULL)
 			pg_hybrid_free((void *)out_varlena);
-
-		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
 
 		PG_RE_THROW();
 	}
 
 	PG_END_TRY();
 
-	BrotliEncoderDestroyInstance((BrotliEncoderState *)state);
 	PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
+	BrotliEncoderDestroyInstance((BrotliEncoderState *)state);
 
 	SET_VARSIZE(out_varlena, initial_data_capacity - available_out + VARHDRSZ);
 
@@ -268,6 +267,7 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 
 	PG_CATCH();
 	{
+		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
 		if (state != NULL)
 			BrotliDecoderDestroyInstance((BrotliDecoderState *)state);
 		if (tmp_buf != NULL)
@@ -275,14 +275,13 @@ pg_unbrotli(PG_FUNCTION_ARGS)
 		if (out_buf != NULL)
 			pg_hybrid_free((void *)out_buf);
 
-		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
 		PG_RE_THROW();
 	}
 
 	PG_END_TRY();
 
-	BrotliDecoderDestroyInstance((BrotliDecoderState *)state);
 	PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
+	BrotliDecoderDestroyInstance((BrotliDecoderState *)state);
 	pg_hybrid_free((void *)tmp_buf);
 
 	out_varlena = (struct varlena *)out_buf;

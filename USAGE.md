@@ -60,7 +60,7 @@
 
 The `pg_z` extension provides a collection of functions to compress and
 decompress data within PostgreSQL using standard industry algorithms:
-[Brotli][1], [Gzip][2]/Deflate (zlib), [LZ4][3], [Snappy][4], and
+[Brotli][1], Gzip/Deflate ([zlib][2]), [LZ4][3], [Snappy][4], and
 [Zstandard][5] (zstd).
 
 Compression functions accept both `bytea` and `text` data types. Decompression
