@@ -6,8 +6,10 @@ tmp/results/*
 
 # Autotools generated files
 /autom4te.cache/
+/config.guess
 /config.log
 /config.status
+/config.sub
 /configure
 /configure~
 /Makefile.port

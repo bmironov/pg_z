@@ -2,6 +2,10 @@
 
 <!-- toc -->
 
+- [Core Functions](#core-functions)
+    * [`pg_z_vresion`](#pg_z_vresion)
+        + [`pg_z_vresion` Description](#pg_z_vresion-description)
+        + [`pg_z_vresion` Examples](#pg_z_vresion-examples)
 - [Brotli Algorithm](#brotli-algorithm)
     * [`brotli`](#brotli)
         + [`brotli` Description](#brotli-description)
@@ -66,6 +70,44 @@ decompress data within PostgreSQL using standard industry algorithms:
 Compression functions accept both `bytea` and `text` data types. Decompression
 functions strictly take `bytea` inputs and return the raw decompressed `bytea`
 stream.
+
+The extension also provides a built-in diagnostic function `pg_z_version()`.
+It dynamically queries the compiled `pg_z.so` binary at runtime to report the
+exact set of active userspace compression engines available on your specific
+PostgreSQL instance.
+
+## Core Functions
+
+### `pg_z_vresion`
+
+```text
+pg_z_version() → text
+```
+
+#### `pg_z_vresion` Description
+
+The `pg_z_version()` function returns a descriptive text string indicating the
+extension version and the exact list of compression algorithms successfully
+compiled into the active runtime binary.
+
+This function is fully `IMMUTABLE`, `STRICT`, and `PARALLEL SAFE`, allowing the
+PostgreSQL query planner to safely evaluate it within any parallel worker paths.
+
+#### `pg_z_vresion` Examples
+
+```sql
+postgres=# SELECT pg_z_version();
+                 pg_z_version
+-----------------------------------------------
+ pg_z v1.0 (compiled with: brotli, gzip, deflate, lz4, snappy, zstd)
+(1 row)
+```
+
+This output dynamically adjusts based on your build configuration, providing a
+reliable method for database administrators or migration scripts to verify
+available compression capabilities on the fly.
+
+***
 
 ## Brotli Algorithm
 

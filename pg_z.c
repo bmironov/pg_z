@@ -5,6 +5,8 @@
 
 PG_MODULE_MAGIC;
 
+PG_FUNCTION_INFO_V1(pg_z_version);
+
 // GUC: memory allocation chunk size in bytes
 size_t memory_chunk_size;
 static int guc_memory_chunk_size;
@@ -83,6 +85,56 @@ _PG_init(void)
 
 	pg_mem_tracker_init_hugepage_size();
 }
+
+Datum
+pg_z_version(PG_FUNCTION_ARGS)
+{
+	/*
+	 * Accumulate active userspace algorithms into a clean comma-separated list
+	 */
+	char buf[256] = "pg_z v" PG_Z_VERSION " (compiled with: ";
+	bool first = true;
+
+#ifdef USE_brotli
+	strcat(buf, "brotli");
+	first = false;
+#endif
+
+#ifdef USE_gzip
+	if (!first)
+		strcat(buf, ", ");
+	strcat(buf, "gzip, deflate");
+	first = false;
+#endif
+
+#ifdef USE_lz4
+	if (!first)
+		strcat(buf, ", ");
+	strcat(buf, "lz4");
+	first = false;
+#endif
+
+#ifdef USE_snappy
+	if (!first)
+		strcat(buf, ", ");
+	strcat(buf, "snappy");
+	first = false;
+#endif
+
+#ifdef USE_zstd
+	if (!first)
+		strcat(buf, ", ");
+	strcat(buf, "zstd");
+#endif
+
+	strcat(buf, ")");
+
+	PG_RETURN_TEXT_P(cstring_to_text(buf));
+}
+
+/*
+ * Helper function to dump hex values
+ */
 
 void
 dump_hex(const char *label, const uint8 *data, size_t size)

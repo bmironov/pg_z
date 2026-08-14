@@ -2,12 +2,15 @@
 
 #include <fmgr.h>
 #include <funcapi.h>
+#include <utils/builtins.h>
 #include <utils/guc.h>
 #include <utils/memutils.h>
 #include <varatt.h>
 
 #ifndef PG_Z_H
 #define PG_Z_H
+
+#define PG_Z_VERSION "1.0"
 
 #ifdef _WIN32
 /* Windows compatibility stubs for compilation */
@@ -36,6 +39,14 @@ extern size_t memory_chunk_size;
 
 // GUC: maximum size of decompressed data in bytes; -1 = unlimited
 extern size_t max_uncompressed_size;
+
+/*
+ * ===============================================================
+ * Common functions for the pg_z extension
+ * ===============================================================
+ */
+
+Datum pg_z_version(PG_FUNCTION_ARGS);
 
 /*
  * ===============================================================

@@ -1,0 +1,11 @@
+CREATE EXTENSION pg_z;
+--
+-- pg_z_vresion
+--
+SELECT pg_z_version();
+                            pg_z_version                             
+---------------------------------------------------------------------
+ pg_z v1.0 (compiled with: brotli, gzip, deflate, lz4, snappy, zstd)
+(1 row)
+
+DROP EXTENSION pg_z;
