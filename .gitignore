@@ -2,7 +2,7 @@
 *.so
 *.bc
 
-tmp/results/*
+tmp/*
 
 # Autotools generated files
 /autom4te.cache/

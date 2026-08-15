@@ -208,41 +208,10 @@ AS_IF([test "x$with_zstd" = "xyes"], [
 ])
 
 
-# ===========================================================================
-# CONDITIONAL FEATURES METADATA PARSING
-# ===========================================================================
-
-ALL_LIBS=" $DYNAMIC_LIBS $STATIC_LIBS "
-case "$ALL_LIBS" in
-    *" -lbrotli"*) SUPPORT_BROTLI="" ;;
-esac
-
-case "$ALL_LIBS" in
-    *" -lz "*|*" -lz-zlib-ng"*) SUPPORT_ZLIB="" ;;
-esac
-
-case "$ALL_LIBS" in
-    *" -llz4"*)    SUPPORT_LZ4="" ;;
-esac
-
-case "$ALL_LIBS" in
-    *" -lsnappy"*) SUPPORT_SNAPPY="" ;;
-esac
-
-case "$ALL_LIBS" in
-    *" -lzstd"*)   SUPPORT_ZSTD="" ;;
-esac
-
-
 # Export results
 AC_SUBST(DYNAMIC_LIBS)
 AC_SUBST(STATIC_LIBS)
 AC_SUBST(COMPRESSION_CFLAGS)
-AC_SUBST(SUPPORT_BROTLI)
-AC_SUBST(SUPPORT_ZLIB)
-AC_SUBST(SUPPORT_LZ4)
-AC_SUBST(SUPPORT_SNAPPY)
-AC_SUBST(SUPPORT_ZSTD)
 
 CONFIGURE_RUN="yes"
 AC_SUBST(CONFIGURE_RUN)

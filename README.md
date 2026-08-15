@@ -10,7 +10,11 @@
 - [Data-Flow with `pg_z`](#data-flow-with-pg_z)
 - [Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`](#usage-of-postgresql-v18-ability-to-install-extensions-without-sudo)
 - [Compiling the Extension with Debug Information](#compiling-the-extension-with-debug-information)
-- [Supplied Unit Tests for `pg_z` Functions](#supplied-unit-tests-for-pg_z-functions)
+- [Supplied Unit Tests for the `pg_z` Functions](#supplied-unit-tests-for-the-pg_z-functions)
+- [Supplied Benchmarks for the `pg_z` Functions](#supplied-benchmarks-for-the-pg_z-functions)
+    * [Running the Benchmarks](#running-the-benchmarks)
+    * [Test Dataset Characteristics](#test-dataset-characteristics)
+    * [Sample Execution Output](#sample-execution-output)
 - [Highlights of `pg_z` extension](#highlights-of-pg_z-extension)
     * [Zero-Copy Architecture](#zero-copy-architecture)
     * [Decompression Bomb Protection and Size Estimation](#decompression-bomb-protection-and-size-estimation)
@@ -128,7 +132,7 @@ compression algorithms, arranged in alphabetical order:
 | Algorithm | Compression Function | Decompression Function |
 | :-------- | :------------------- | :---------------------- |
 | [Brotli][7] | `brotli` | `unbrotli` |
-| [deflate][8] | `deflate` | `inflate` |
+| [Deflate][8] | `deflate` | `inflate` |
 | [Gzip][8] | `gzip` | `gunzip` (aka `ungzip`) |
 | [LZ4][9] | `lz4` | `unlz4` |
 | [Snappy][10] | `snappy` | `unsnappy` |
@@ -187,7 +191,7 @@ Simply run:
 make debug
 ```
 
-## Supplied Unit Tests for `pg_z` Functions
+## Supplied Unit Tests for the `pg_z` Functions
 
 According to the standard for an [extension's Makefile][3] there `installcheck`
 target executes the set of unit tests supplied with the extension. Run it as
@@ -208,20 +212,94 @@ In case of successful unit test run, output should look similar to this:
 ```text
 # +++ regress install-check in  +++
 # using postmaster on Unix socket, default port
-ok 1         - brotli                                     48 ms
-ok 2         - gzip                                       66 ms
-ok 3         - deflate                                    58 ms
-ok 4         - lz4                                        23 ms
-ok 5         - snappy                                     21 ms
-ok 6         - zstd                                       35 ms
-ok 7         - db_params                                   9 ms
-1..7
-# All 7 tests passed.
+ok 1         - core                                       15 ms
+ok 2         - db_params                                  12 ms
+ok 3         - brotli                                     49 ms
+ok 4         - gzip                                       67 ms
+ok 5         - deflate                                    62 ms
+ok 6         - lz4                                        27 ms
+ok 7         - snappy                                     23 ms
+ok 8         - zstd                                       38 ms
+1..8
+# All 8 tests passed.
 ```
 
 Since the tests are similar in nature, the difference in execution time between
 the supplied compression and decompression algorithms is quite visible and
 directly points to the performance of these algorithms.
+
+## Supplied Benchmarks for the `pg_z` Functions
+
+The extension includes a built-in benchmarking suite to evaluate the performance
+of the supported compression and decompression algorithms directly inside your
+PostgreSQL instance.
+
+### Running the Benchmarks
+
+To execute the full benchmarking suite against the active algorithms configured
+during setup, run the following command from the root directory:
+
+```bash
+make clean
+make
+make benchmark
+```
+
+The script automatically prepares the test environment, executes compression and
+decompression routines, tracks execution duration in milliseconds, and securely
+tears down the benchmark database objects afterward.
+
+### Test Dataset Characteristics
+
+The suite generates a highly compressible temporary dataset to closely simulate
+structured database logs with repetitive patterns:
+
+- **Data Structure:** A continuous text block aggregated from 200,000 log
+  records.
+- **Record Profile:** Each line spans ~571 bytes and contains repeating log
+  metadata.
+- **Overall Size:** Approximately ~110 MB of uncompressed raw text data.
+
+### Sample Execution Output
+
+Below is a typical TAP-compliant output example demonstrating performance
+metrics:
+
+```text
+Prepared following test data set:
+ dataset_size_bytes | dataset_size_pretty
+--------------------+---------------------
+  115,088,895       | 110 MB
+(1 row)
+
+--------------+----------------------+--------------+-----------
+Test #/Result | Algorithm / Function | Result, bytes| Duration
+--------------+----------------------+--------------+-----------
+  1 OK        | brotli compress      |      307,976 |    154 ms
+  2 OK        | brotli decompress    |  115,088,895 |  5,512 ms
+--------------+----------------------+--------------+-----------
+  3 OK        | gzip compress        |      957,968 |    364 ms
+  4 OK        | gzip decompress      |  115,088,895 |  5,647 ms
+--------------+----------------------+--------------+-----------
+  5 OK        | deflate compress     |      957,950 |    348 ms
+  6 OK        | deflate decompress   |  115,088,895 |  5,589 ms
+--------------+----------------------+--------------+-----------
+  7 OK        | lz4 compress         |    1,401,239 |    211 ms
+  8 OK        | lz4 decompress       |  115,088,895 |     51 ms
+--------------+----------------------+--------------+-----------
+  9 OK        | snappy compress      |    6,712,722 |     73 ms
+ 10 OK        | snappy decompress    |  115,088,895 |  5,195 ms
+--------------+----------------------+--------------+-----------
+ 11 OK        | zstd compress        |      313,561 |    168 ms
+ 12 OK        | zstd decompress      |  115,088,895 |     56 ms
+--------------+----------------------+--------------+-----------
+1..12
+# All 12 benchmarks passed.
+Cleaning up benchmark environment...
+```
+
+Use these results to determine the optimal trade-off between compression speed,
+decompression overhead, and CPU resource utilization for your specific workload.
 
 ## Highlights of `pg_z` extension
 

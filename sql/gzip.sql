@@ -29,6 +29,7 @@ SELECT gzip('The quick brown fox jumps over the lazy dog'::bytea, 10) AS gzip_er
 
 -- gunzip function tests
 SELECT convert_from(gunzip(gzip('The quick brown fox jumps over the lazy dog')), 'utf8') AS gunzip_ok;
+SELECT convert_from(ungzip(gzip('The quick brown fox jumps over the lazy dog')), 'utf8') AS ungzip_ok;
 SELECT gunzip(''::bytea) AS gunzip_blank;
 SELECT gunzip('\x00'::bytea) AS gunzip_8;
 SELECT gunzip('\x0000'::bytea) AS gunzip_16;

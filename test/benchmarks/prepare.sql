@@ -1,4 +1,11 @@
+\o /dev/null
+
+-- Show ERRORs only and turn off NOTICEs and WARNINGs
+SET client_min_messages TO error;
+\set QUIET on
+
 \timing off
+
 DROP EXTENSION IF EXISTS pg_z;
 DROP TABLE IF EXISTS temp_benchmark_data;
 
@@ -28,9 +35,10 @@ SELECT
     '?'::bytea AS compressed_data
 FROM generate_series(1, 200000) AS i;
 
+\o
+\echo Prepared following test data set:
 -- getting exact size of test data
 SELECT
-    octet_length(raw_text)::bigint AS data_size_bytes,
-    (octet_length(raw_text)::float / 1024 / 1024)::numeric(10,2) AS data_size_mb,
-    pg_size_pretty(octet_length(raw_text)::bigint) AS data_size_pretty
+    to_char(octet_length(raw_text)::bigint, '999,999,999') AS dataset_size_bytes,
+    pg_size_pretty(octet_length(raw_text)::bigint) AS dataset_size_pretty
 FROM temp_benchmark_data;

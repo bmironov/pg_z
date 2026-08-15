@@ -73,6 +73,12 @@ SELECT convert_from(gunzip(gzip('The quick brown fox jumps over the lazy dog')),
  The quick brown fox jumps over the lazy dog
 (1 row)
 
+SELECT convert_from(ungzip(gzip('The quick brown fox jumps over the lazy dog')), 'utf8') AS ungzip_ok;
+                  ungzip_ok                  
+---------------------------------------------
+ The quick brown fox jumps over the lazy dog
+(1 row)
+
 SELECT gunzip(''::bytea) AS gunzip_blank;
  gunzip_blank 
 --------------
