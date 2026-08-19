@@ -69,8 +69,8 @@ pg_lz4(PG_FUNCTION_ARGS)
 				 max_uncompressed_size);
 
 		// Validate compression level
-		if (!(compression_level >= 0 && compression_level <= 12))
-			elog(ERROR, "compression level must be in range 0..12");
+		if (!(compression_level >= 0 && compression_level <= 16))
+			elog(ERROR, "compression level must be in range 0..16");
 
 		cmem = get_pg_lz4_allocator();
 		cCtx = LZ4F_createCompressionContext_advanced(cmem, LZ4F_VERSION);

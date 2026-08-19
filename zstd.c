@@ -66,9 +66,9 @@ pg_zstd(PG_FUNCTION_ARGS)
 				 "input data is limited by pg_z.max_size (%zu bytes)",
 				 max_uncompressed_size);
 
-		if (!(compression_level >= 1 && compression_level <= 19))
+		if (!(compression_level >= 1 && compression_level <= 22))
 			elog(ERROR,
-				 "invalid compression level (outside of 1..19): %d",
+				 "invalid compression level (outside of 1..22): %d",
 				 compression_level);
 
 		// Determine safe upper bound for output buffer size
