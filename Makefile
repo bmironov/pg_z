@@ -6,7 +6,7 @@ BUILD_DIR = tmp
 SRC_MODULES = pg_z mem_manager
 ALGO_MODULES = brotli gzip lz4 snappy zstd
 
--include Makefile.port tmp/Makefile.port
+-include $(top_srcdir)/Makefile.port Makefile.port ../Makefile.port
 
 REGRESS := core db_params
 ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(COMPRESSION_CFLAGS))
@@ -21,13 +21,19 @@ export BENCHMARK_ALGOS
 export CONFIGURE_RUN
 export DATA
 
+# Extract possible list of algos for load test
+ifeq (load_test,$(firstword $(MAKECMDGOALS)))
+  LOADTEST_ALGOS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(LOADTEST_ALGOS):;@:)
+endif
+LOADTEST_ALGOS ?= $(BENCHMARK_ALGOS)
 
 # ========================================================================
 # First part: start from root with redirect to $(BUILD_DIR)
 # ========================================================================
 ifeq ($(filter $(BUILD_DIR),$(notdir $(CURDIR))),)
 
-.PHONY: all debug install installcheck benchmark clean
+.PHONY: all debug install installcheck benchmark load_test clean
 
 all:
 	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=..
@@ -44,7 +50,10 @@ installcheck: all
 	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. installcheck
 
 benchmark: all
-	@./build/run_benchmark.sh
+	@build/benchmark.sh
+
+load_test: all
+	@build/load_test.sh "$(LOADTEST_ALGOS)"
 
 clean:
 	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. clean
@@ -96,7 +105,7 @@ ifndef DEBUG_BUILD
 	@$(STRIP_CMD)
 endif
 	@echo "=== Generating SQL extension file ==="
-	@../build/assemble_sql.sh ..
+	@../build/generate_sql.sh ..
 endif
 
 endif

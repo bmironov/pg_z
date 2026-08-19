@@ -24,18 +24,13 @@ echo "Test #/Result | Algorithm / Function | Result, bytes| Duration"
 for ALGO in $BENCHMARK_ALGOS; do
     echo "--------------+----------------------+--------------+-----------"
     for PHASE in save compress decompress; do
+        TEST=${ALGO}_${PHASE}
+        FUNC="${ALGO}"
         case "${PHASE}" in
-        save)
-            TEST=${ALGO}_${PHASE}
-            FUNC="${ALGO}"
-            ;;
-        compress)
-            TEST=${ALGO}_${PHASE}
-            FUNC="${ALGO}"
+        compress | save)
+            true
             ;;
         decompress)
-            TEST=${ALGO}_${PHASE}
-            FUNC="un${ALGO}"
             [ "$ALGO" == "deflate" ] && FUNC="inflate"
             ;;
         *)

@@ -13,8 +13,12 @@
 - [Supplied Unit Tests for the `pg_z` Functions](#supplied-unit-tests-for-the-pg_z-functions)
 - [Supplied Benchmarks for the `pg_z` Functions](#supplied-benchmarks-for-the-pg_z-functions)
     * [Running the Benchmarks](#running-the-benchmarks)
-    * [Test Dataset Characteristics](#test-dataset-characteristics)
-    * [Sample Execution Output](#sample-execution-output)
+    * [Benchmark Test Dataset Characteristics](#benchmark-test-dataset-characteristics)
+    * [Sample Benchmark Test Execution Output](#sample-benchmark-test-execution-output)
+- [Supplied Load-Test for the `pg_z` Compression Functions](#supplied-load-test-for-the-pg_z-compression-functions)
+    * [Running the Load Test](#running-the-load-test)
+    * [Load Test Dataset Characteristics](#load-test-dataset-characteristics)
+    * [Sample Load Test Execution Output](#sample-load-test-execution-output)
 - [Highlights of `pg_z` extension](#highlights-of-pg_z-extension)
     * [Zero-Copy Architecture](#zero-copy-architecture)
     * [Decompression Bomb Protection and Size Estimation](#decompression-bomb-protection-and-size-estimation)
@@ -249,7 +253,7 @@ The script automatically prepares the test environment, executes compression and
 decompression routines, tracks execution duration in milliseconds, and securely
 tears down the benchmark database objects afterward.
 
-### Test Dataset Characteristics
+### Benchmark Test Dataset Characteristics
 
 The suite generates a highly compressible temporary dataset to closely simulate
 structured database logs with repetitive patterns:
@@ -260,7 +264,18 @@ structured database logs with repetitive patterns:
   metadata.
 - **Overall Size:** Approximately ~110 MB of uncompressed raw text data.
 
-### Sample Execution Output
+### Sample Benchmark Test Execution Output
+
+All tests are executed against the same dataset using the default compression
+level for each algorithm. Each individual test runs in three steps:
+
+- On-the-fly compression of the dataset (marked as "compress");
+- Database table column update with the compression result (not shown below);
+- On-the-fly decompression of the compressed column (marked as "decompress").
+
+This architecture allows you to compare different algorithms under distinct
+operational loads. The table displays the output size in bytes and the total
+execution duration.
 
 Below is a typical TAP-compliant output example demonstrating performance
 metrics:
@@ -300,6 +315,89 @@ Cleaning up benchmark environment...
 
 Use these results to determine the optimal trade-off between compression speed,
 decompression overhead, and CPU resource utilization for your specific workload.
+
+## Supplied Load-Test for the `pg_z` Compression Functions
+
+The extension includes a built-in load-test suite to evaluate the performance
+of the supported compression algorithms directly inside your PostgreSQL
+instance.
+
+### Running the Load Test
+
+To execute the full load test suite against the active algorithms configured
+during setup, run the following command from the root directory:
+
+```bash
+make clean
+make
+make load_test
+```
+
+The script automatically prepares the test environment, executes compression
+routines, tracks execution duration in milliseconds, and securely
+tears down the test database objects afterward.
+
+### Load Test Dataset Characteristics
+
+The Load test uses the same dataset as the Benchmark suite described above.
+
+### Sample Load Test Execution Output
+
+Below is a typical TAP-compliant output example demonstrating performance
+metrics:
+
+```text
+Prepared following test data set:
+ dataset_size_bytes | dataset_size_pretty
+--------------------+---------------------
+  115,088,895       | 110 MB
+(1 row)
+
+--------------+----------------------+--------------+-----------
+Test #/Result | Algorithm / Function | Result, bytes| Duration
+----brotli single-threaded-----------+--------------+-----------
+  1 OK        | brotli-0             |      955,911 |     78 ms
+  2 OK        | brotli-3             |      307,977 |    155 ms
+  3 OK        | brotli-11            |      298,162 |  8,506 ms
+----gzip single-threaded-------------+--------------+-----------
+  4 OK        | gzip-1               |      964,208 |    198 ms
+  5 OK        | gzip-6               |      957,968 |    400 ms
+  6 OK        | gzip-9               |      957,968 |    438 ms
+----deflate single-threaded----------+--------------+-----------
+  7 OK        | deflate-1            |      964,190 |    175 ms
+  8 OK        | deflate-6            |      957,950 |    379 ms
+  9 OK        | deflate-9            |      957,950 |    401 ms
+----lz4 single-threaded--------------+--------------+-----------
+ 10 OK        | lz4-0                |    1,513,810 |     60 ms
+ 11 OK        | lz4-5                |    1,401,239 |    211 ms
+ 12 OK        | lz4-16               |    1,403,227 |  1,243 ms
+----snappy single-threaded-----------+--------------+-----------
+ 13 OK        | snappy               |    6,712,723 |     72 ms
+----zstd single-threaded-------------+--------------+-----------
+ 14 OK        | zstd-1               |      393,722 |     64 ms
+ 15 OK        | zstd-7               |      312,368 |    163 ms
+ 16 OK        | zstd-19              |      310,781 | 18,396 ms
+----zstd multi-threaded--------------+--------------+-----------
+ 17 OK        | zstd-7-1             |      312,368 |    162 ms
+ 18 OK        | zstd-7-2             |      312,368 |    160 ms
+ 19 OK        | zstd-7-4             |      312,368 |    161 ms
+ 20 OK        | zstd-7-8             |      312,368 |    161 ms
+--------------+----------------------+--------------+-----------
+1..20
+# All 20 benchmarks passed.
+Cleaning up benchmark environment...
+```
+
+Feel free to modify the data generation script or the Bash runner script to
+test with your own workload and find the optimal configuration for your specific
+data.
+
+To speed up testing, you can run the load test as follows and specify only the
+required compression algorithms out of the configured list:
+
+```bash
+make load_test "lz4 zstd"
+```
 
 ## Highlights of `pg_z` extension
 
