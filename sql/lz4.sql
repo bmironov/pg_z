@@ -22,9 +22,9 @@ SELECT sum((str = convert_from(unlz4(lz4(str)), 'utf8'))::integer) AS unlz4_stri
 FROM strs;
 
 
--- incorrect compression_level (out of range 0..12) should cause error
+-- incorrect compression_level (out of range 0..16) should cause error
 SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea, -2) AS lz4_err_1;
-SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea, 13) AS lz4_err_2;
+SELECT lz4('The quick brown fox jumps over the lazy dog'::bytea, 19) AS lz4_err_2;
 
 
 -- unlz4 function tests
@@ -37,7 +37,7 @@ SELECT unlz4(lz4('\x00000000000000000000'::bytea)) AS lz4_roundtrip_zero;
 
 -- error propagation
 SELECT unlz4(lz4('The quick brown fox jumps over the lazy dog'::bytea, -2)) AS unlz4_err_1;
-SELECT unlz4(lz4('The quick brown fox jumps over the lazy dog'::bytea, 13)) AS unlz4_err_2;
+SELECT unlz4(lz4('The quick brown fox jumps over the lazy dog'::bytea, 19)) AS unlz4_err_2;
 
 
 -- check limit set by DB parameter

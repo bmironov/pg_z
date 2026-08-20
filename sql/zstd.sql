@@ -23,7 +23,7 @@ SELECT sum((str = convert_from(unzstd(zstd(str)), 'utf8'))::integer) AS unzstd_s
 FROM strs;
 
 
--- incorrect compression_level (out of range 1..19) shouldn't cause an error
+-- incorrect compression_level (out of range 1..22) shouldn't cause an error
 SELECT zstd('The quick brown fox jumps over the lazy dog'::bytea, -100) AS zstd_err_1;
 SELECT zstd('The quick brown fox jumps over the lazy dog'::bytea, 100) AS zstd_err_2;
 

@@ -67,11 +67,11 @@ FROM strs;
            1000
 (1 row)
 
--- incorrect compression_level (out of range 1..19) shouldn't cause an error
+-- incorrect compression_level (out of range 1..22) shouldn't cause an error
 SELECT zstd('The quick brown fox jumps over the lazy dog'::bytea, -100) AS zstd_err_1;
-ERROR:  invalid compression level (outside of 1..19): -100
+ERROR:  invalid compression level (outside of 1..22): -100
 SELECT zstd('The quick brown fox jumps over the lazy dog'::bytea, 100) AS zstd_err_2;
-ERROR:  invalid compression level (outside of 1..19): 100
+ERROR:  invalid compression level (outside of 1..22): 100
 -- unzstd function tests
 SELECT convert_from(unzstd(zstd('The quick brown fox jumps over the lazy dog')), 'utf8') AS unzstd_ok;
                   unzstd_ok                  
@@ -98,9 +98,9 @@ SELECT unzstd(zstd('\x00000000000000000000'::bytea)) AS zstd_roundtrip_zero;
 (1 row)
 
 SELECT unzstd(zstd('The quick brown fox jumps over the lazy dog'::bytea, -100)) AS unzstd_err_1;
-ERROR:  invalid compression level (outside of 1..19): -100
+ERROR:  invalid compression level (outside of 1..22): -100
 SELECT unzstd(zstd('The quick brown fox jumps over the lazy dog'::bytea, 100)) AS unzstd_err_2;
-ERROR:  invalid compression level (outside of 1..19): 100
+ERROR:  invalid compression level (outside of 1..22): 100
 -- check limit set by DB parameter
 SHOW pg_z.max_size;
  pg_z.max_size 
