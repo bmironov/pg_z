@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
 
 jobs:
   build-and-test:
@@ -26,15 +26,42 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run Load Test Inside Container
+      - name: Create Shared Database Volume
         run: |
-          docker run --rm --user postgres pg_z:test /bin/bash -c "
-            # Set up cluster directory path
-            export PGDATA=/var/lib/postgresql/data &&
-            # Create directory and initialize structural database layout
-            mkdir -p \$PGDATA && initdb -D \$PGDATA &&
-            # Start PostgreSQL 18 server in the background using pg_ctl
-            pg_ctl start -D \$PGDATA -w &&
-            # Execute your built-in extension test suite
-            make load_test
-          "
+          # Create a shared directory on the host with correct permissions
+          mkdir -p ${{ github.workspace }}/pgdata
+          chmod 777 ${{ github.workspace }}/pgdata
+
+      - name: Run Installcheck Test
+        run: |
+          docker run --rm --user postgres \
+            -v ${{ github.workspace }}/pgdata:/mnt/shared \
+            pg_z:test /bin/bash -c "
+              export PGDATA=/mnt/shared/db_cluster &&
+              mkdir -p \$PGDATA && initdb -D \$PGDATA &&
+              pg_ctl start -D \$PGDATA -w &&
+              PGUSER=postgres make installcheck &&
+              pg_ctl stop -D \$PGDATA -m fast
+            "
+
+      - name: Run Benchmark Test
+        run: |
+          docker run --rm --user postgres \
+            -v ${{ github.workspace }}/pgdata:/mnt/shared \
+            pg_z:test /bin/bash -c "
+              export PGDATA=/mnt/shared/db_cluster &&
+              pg_ctl start -D \$PGDATA -w &&
+              make benchmark &&
+              pg_ctl stop -D \$PGDATA -m fast
+            "
+
+      - name: Run Load Test
+        run: |
+          docker run --rm --user postgres \
+            -v ${{ github.workspace }}/pgdata:/mnt/shared \
+            pg_z:test /bin/bash -c "
+              export PGDATA=/mnt/shared/db_cluster &&
+              pg_ctl start -D \$PGDATA -w &&
+              make load_test &&
+              pg_ctl stop -D \$PGDATA -m fast
+            "
