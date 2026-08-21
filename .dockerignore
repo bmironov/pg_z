@@ -1,0 +1,17 @@
+.git
+.github
+.gitignore
+
+# Ignore Autoconf
+autom4te.cache
+config.log
+config.status
+configure
+Makefile.port
+
+docs/
+k8s/
+
+*.md
+.DS_Store
+

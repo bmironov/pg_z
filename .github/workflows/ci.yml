@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: builder
@@ -35,6 +35,7 @@ jobs:
       - name: Run Installcheck Test
         run: |
           docker run --rm --user postgres \
+            -w /build/pg_z \
             -v ${{ github.workspace }}/pgdata:/mnt/shared \
             pg_z:test /bin/bash -c "
               export PGDATA=/mnt/shared/db_cluster &&
@@ -47,6 +48,7 @@ jobs:
       - name: Run Benchmark Test
         run: |
           docker run --rm --user postgres \
+            -w /build/pg_z \
             -v ${{ github.workspace }}/pgdata:/mnt/shared \
             pg_z:test /bin/bash -c "
               export PGDATA=/mnt/shared/db_cluster &&
@@ -58,6 +60,7 @@ jobs:
       - name: Run Load Test
         run: |
           docker run --rm --user postgres \
+            -w /build/pg_z \
             -v ${{ github.workspace }}/pgdata:/mnt/shared \
             pg_z:test /bin/bash -c "
               export PGDATA=/mnt/shared/db_cluster &&
