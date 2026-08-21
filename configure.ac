@@ -10,6 +10,7 @@ if test -f /etc/debian_version; then
     is_debian=yes
 fi
 
+AC_CHECK_LIB([m], [cos]) # Required for static linking of Brotli
 
 # ===========================================================================
 # COMMAND LINE ARGUMENTS & OPTIONS FOR --help
@@ -87,18 +88,11 @@ AS_IF([test "x$is_debian" = "xyes"], [
 ])
 
 
-
-SUPPORT_BROTLI="-- "
-SUPPORT_ZLIB="-- "
-SUPPORT_LZ4="-- "
-SUPPORT_SNAPPY="-- "
-SUPPORT_ZSTD="-- "
-
 SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
 
 # Variables to accumulate verified runtime libraries
-DYNAMIC_LIBS=""
 STATIC_LIBS=""
+DYNAMIC_LIBS=""
 COMPRESSION_CFLAGS=""
 
 # ===========================================================================
@@ -106,24 +100,34 @@ COMPRESSION_CFLAGS=""
 # ===========================================================================
 
 # Reusable macro to check for dynamic libraries
-AC_DEFUN([AC_CHECK_DYNAMIC_LIB], [
-    AC_CHECK_LIB([$1], [$2], [
-        AS_VAR_APPEND([DYNAMIC_LIBS], [" -l$1"])
-    ], [
-        AC_MSG_NOTICE([Library lib$1.so is missing. If its functionality is needed, install $3 development package.])
-    ])
-])
+# Parameters:
+# $1 flag variable suffix (eg, zlib_ng)
+# $2 common name of the library (eg, 'zlib-ng')
+# $3 official library name on the filesystem (as lib$2,so, or 'z-ng' for zlib-ng)
+# $4 function defined by library (eg, zng_deflate)
+AC_DEFUN([MY_CHECK_LIB], [
+    AS_VAR_SET([HAVE_$1], [no])
+    LIBS="-l$3 $LIBS"
 
-# Reusable macro to check for static libraries
-AC_DEFUN([AC_CHECK_STATIC_LIB], [
-    AC_CHECK_HEADERS([$1], [
-        AS_IF([test -f "$SYSTEM_LIB_DIR/lib$2.a"], [
-            AS_VAR_APPEND([STATIC_LIBS], [" -l$2"])
-        ] , [
-            AC_MSG_NOTICE([Library $2.a is missing. If its functionality is needed, install $2 development package.])
+    AS_IF([test "$MODE" = "static"], [
+        save_LDFLAGS="$LDFLAGS"
+        LDFLAGS="$LDFLAGS -static"
+
+        AC_CHECK_LIB([$3], [$4], [
+            AS_VAR_APPEND([STATIC_LIBS], [" -l$3"])
+            AS_VAR_SET([HAVE_$1], [yes])
+        ], [
+            AC_MSG_NOTICE([Library lib$3.a is missing. If its functionality is needed, install $1 development package.])
         ])
+
+        LDFLAGS="$save_LDFLAGS"
     ], [
-        AC_MSG_NOTICE([$1 header is missing. Please install $2 development package])
+        AC_CHECK_LIB([$3], [$4], [
+            AS_VAR_APPEND([DYNAMIC_LIBS], [" -l$3"])
+            AS_VAR_SET([HAVE_$1], [yes])
+        ], [
+            AC_MSG_NOTICE([Library lib$3.so is missing. If its functionality is needed, install $1 development package.])
+        ])
     ])
 ])
 
@@ -134,76 +138,68 @@ AC_DEFUN([AC_CHECK_STATIC_LIB], [
 
 # --- Brotli ---
 AS_IF([test "x$with_brotli" = "xyes"], [
-    AS_IF([test "$BROTLI" = "static"], [
-        AC_CHECK_STATIC_LIB([brotli/encode.h],            [brotlienc])
-        AC_CHECK_STATIC_LIB([brotli/decode.h],            [brotlidec])
-        AC_CHECK_STATIC_LIB([brotli/shared_dictionary.h], [brotlicommon])
-    ], [
-        AC_CHECK_DYNAMIC_LIB([brotlicommon], [BrotliSharedDictionaryCreateInstance], [libbrotli])
-        AC_CHECK_DYNAMIC_LIB([brotlienc],    [BrotliEncoderCreateInstance],          [libbrotli])
-        AC_CHECK_DYNAMIC_LIB([brotlidec],    [BrotliDecoderCreateInstance],          [libbrotli])
+    MODE="$BROTLI"
+    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
+    MY_CHECK_LIB([brotli_e], [libbrotli], [brotlienc],    [BrotliEncoderCreateInstance])
+    MY_CHECK_LIB([brotli_d], [libbrotli], [brotlidec],    [BrotliDecoderCreateInstance])
+    AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
     ])
-    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
 ])
 
 # --- Gzip / Deflate ---
 # Process standard legacy Zlib engine
 AS_IF([test "x$with_gzip" = "xyes"], [
-    AS_IF([test "$ZLIB" = "static"], [
-        AC_CHECK_STATIC_LIB([zlib.h], [z])
-    ], [
-        AC_CHECK_DYNAMIC_LIB([z], [deflate], [zlib])
+    MODE="$ZLIB"
+    MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
+    AS_IF([test "x$HAVE_zlib" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
     ])
-    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
 ])
 
 # Process Zlib-NG engine
 AS_IF([test "x$with_gzip_ng" = "xyes"], [
-    AS_IF([test "$ZLIB_NG" = "static"], [
-        AC_CHECK_STATIC_LIB([zlib-ng.h], [z-ng])
-    ], [
-        AC_CHECK_DYNAMIC_LIB([z-ng], [zng_deflate], [libz-ng])
+    MODE="$ZLIB_NG"
+    MY_CHECK_LIB([zlib_ng], [libz-ng], [z-ng], [zng_deflate])
+    AS_IF([test "x$HAVE_zlib_ng" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
     ])
-    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
 ])
 
 # --- Lz4 ---
 AS_IF([test "x$with_lz4" = "xyes"], [
-    AS_IF([test "$LZ4" = "static"], [
-        AC_CHECK_STATIC_LIB([lz4.h], [lz4])
-    ], [
-        AC_CHECK_DYNAMIC_LIB([lz4], [LZ4_compress_default], [liblz4])
+    MODE="$LZ4"
+    MY_CHECK_LIB([lz4], [liblz4], [lz4], [LZ4_compress_default])
+    AS_IF([test "x$HAVE_lz4" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_lz4"])
     ])
-    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_lz4"])
 ])
 
 # --- Snappy ---
 AS_IF([test "x$with_snappy" = "xyes"], [
-    AS_IF([test "$SNAPPY" = "static"], [
-        AC_CHECK_STATIC_LIB([snappy.h], [snappy])
-    ], [
-        AC_CHECK_DYNAMIC_LIB([snappy], [snappy_compress], [libsnappy])
+    MODE="$SNAPPY"
+    MY_CHECK_LIB([snappy], [libsnappy], [snappy], [snappy_compress])
+    AS_IF([test "x$HAVE_snappy" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_snappy"])
     ])
-    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_snappy"])
 ])
 
 # --- Zstandard ---
 AS_IF([test "x$with_zstd" = "xyes"], [
-    AS_IF([test "$ZSTD" = "static"], [
-        AC_CHECK_STATIC_LIB([zstd.h], [zstd])
-    ], [
-        AC_CHECK_DYNAMIC_LIB([zstd], [ZSTD_compress], [libzstd])
+    MODE="$ZSTD"
+    MY_CHECK_LIB([zstd], [libzstd], [zstd], [ZSTD_compress])
+    AS_IF([test "x$HAVE_zstd" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_zstd"])
     ])
-    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_zstd"])
 ])
 
+
+CONFIGURE_RUN="yes"
 
 # Export results
 AC_SUBST(DYNAMIC_LIBS)
 AC_SUBST(STATIC_LIBS)
 AC_SUBST(COMPRESSION_CFLAGS)
-
-CONFIGURE_RUN="yes"
 AC_SUBST(CONFIGURE_RUN)
 
 AC_MSG_NOTICE([==================================================])
