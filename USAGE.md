@@ -14,20 +14,20 @@
     * [`unbrotli`](#unbrotli)
         + [`unbrotli` Usage Notes](#unbrotli-usage-notes)
         + [`unbrotli` Examples](#unbrotli-examples)
-- [Gzip and Deflate Algorithms (zlib)](#gzip-and-deflate-algorithms-zlib)
-    * [`deflate`](#deflate)
+- [Gzip and Deflate Algorithms (zlib / zlib-ng)](#gzip-and-deflate-algorithms-zlib--zlib-ng)
+    * [`deflate` / `deflate_ng`](#deflate--deflate_ng)
         + [`deflate` Description](#deflate-description)
         + [`deflate` Usage Notes](#deflate-usage-notes)
         + [`deflate` Examples](#deflate-examples)
-    * [`inflate`](#inflate)
+    * [`inflate` / `inflate_ng`](#inflate--inflate_ng)
         + [`inflate` Description](#inflate-description)
         + [`inflate` Usage Notes](#inflate-usage-notes)
         + [`inflate` Examples](#inflate-examples)
-    * [`gzip`](#gzip)
+    * [`gzip` / `gzip_ng`](#gzip--gzip_ng)
         + [`gzip` Description](#gzip-description)
         + [`gzip` Usage Notes](#gzip-usage-notes)
         + [`gzip` Examples](#gzip-examples)
-    * [`gunzip` (aka `ungzip`)](#gunzip-aka-ungzip)
+    * [`gunzip` (aka `ungzip`) / `gunzip_ng` (aka `ungzip_ng`)](#gunzip-aka-ungzip--gunzip_ng-aka-ungzip_ng)
         + [`gunzip` Description](#gunzip-description)
         + [`gunzip` Usage Notes](#gunzip-usage-notes)
         + [`gunzip` Examples](#gunzip-examples)
@@ -97,9 +97,9 @@ PostgreSQL query planner to safely evaluate it within any parallel worker paths.
 
 ```sql
 postgres=# SELECT pg_z_version();
-                 pg_z_version
------------------------------------------------
- pg_z v1.0 (compiled with: brotli, gzip, deflate, lz4, snappy, zstd)
+                                       pg_z_version
+------------------------------------------------------------------------------------------
+ pg_z v1.0 (compiled with: brotli, gzip, deflate, gzip-ng, deflate-ng, lz4, snappy, zstd)
 (1 row)
 ```
 
@@ -177,20 +177,34 @@ SELECT convert_from(unbrotli(brotli('hello world')), 'UTF8');
 
 ***
 
-## Gzip and Deflate Algorithms (zlib)
+## Gzip and Deflate Algorithms (zlib / zlib-ng)
 
 These functions utilize the standard [`zlib`][2] library. `deflate` processes raw
 compressed streams, while `gzip` wraps the compressed data inside a standard
 gzip file structure wrapper including headers and trailers.
 
+There is a second set of similar functions that utilize `zlib-ng`
+(Zlib Next Generation) library. All of them are named similarly but feature
+the `_ng` suffix.
+
+Please note that `deflate` and `deflate_ng` may produce slightly different
+binary results for the same input. This happens because zlib-ng uses optimized
+match-finding heuristics and different Huffman tree balancing. Regardless of
+these internal variations, the resulting streams remain fully interoperable:
+data compressed with one library can be seamlessly decompressed by the other.
+
 All functions in this section are marked as `PARALLEL SAFE` and `IMMUTABLE`.
 
-### `deflate`
+### `deflate` / `deflate_ng`
 
 ```text
 deflate ( uncompressed bytea [, compression_level integer ] ) → bytea
 
 deflate ( uncompressed text [, compression_level integer ] ) → bytea
+
+deflate_ng ( uncompressed bytea [, compression_level integer ] ) → bytea
+
+deflate_ng ( uncompressed text [, compression_level integer ] ) → bytea
 ```
 
 #### `deflate` Description
@@ -218,14 +232,22 @@ SELECT deflate('hello world');
 
 SELECT deflate('compress me'::bytea, 9);
 -- Result: \x4bcecf2d284a2d2e56c84d0500
+
+SELECT deflate_ng('hello world');
+-- Result: \xcb48cdc9c95728cf2fca490100
+
+SELECT deflate_ng('compress me'::bytea, 9);
+-- Result: \x4bcecf2d284a2d2e56c84d0500
 ```
 
 ***
 
-### `inflate`
+### `inflate` / `inflate_ng`
 
 ```text
 inflate ( compressed bytea ) → bytea
+
+inflate_ng ( compressed bytea ) → bytea
 ```
 
 #### `inflate` Description
@@ -244,16 +266,29 @@ headers.
 ```sql
 SELECT convert_from(inflate(deflate('hello world')), 'UTF8');
 -- Result: hello world
+
+SELECT convert_from(inflate_ng(deflate_ng('hello world')), 'UTF8');
+-- Result: hello world
+
+SELECT convert_from(inflate(deflate_ng('hello world')), 'UTF8');
+-- Result: hello world
+
+SELECT convert_from(inflate_ng(deflate('hello world')), 'UTF8');
+-- Result: hello world
 ```
 
 ***
 
-### `gzip`
+### `gzip` / `gzip_ng`
 
 ```text
 gzip ( uncompressed bytea [, compression_level integer ] ) → bytea
 
 gzip ( uncompressed text [, compression_level integer ] ) → bytea
+
+gzip_ng ( uncompressed bytea [, compression_level integer ] ) → bytea
+
+gzip_ng ( uncompressed text [, compression_level integer ] ) → bytea
 ```
 
 #### `gzip` Description
@@ -274,16 +309,23 @@ command-line `gunzip` utility.
 ```sql
 SELECT gzip('hello world'::bytea, 9);
 -- Result: \x1f8b0800000000000203cb48cdc9c95728cf2fca49010085114a0d0b000000
+
+SELECT gzip_ng('hello world'::bytea, 9);
+-- Result: \x1f8b0800000000000203cb48cdc9c95728cf2fca49010085114a0d0b000000
 ```
 
 ***
 
-### `gunzip` (aka `ungzip`)
+### `gunzip` (aka `ungzip`) / `gunzip_ng` (aka `ungzip_ng`)
 
 ```text
 gunzip ( compressed bytea ) → bytea
 
 ungzip ( compressed bytea ) → bytea
+
+gunzip_ng ( compressed bytea ) → bytea
+
+ungzip_ng ( compressed bytea ) → bytea
 ```
 
 #### `gunzip` Description
@@ -304,6 +346,15 @@ compression format will result in a runtime evaluation error.
 
 ```sql
 SELECT convert_from(gunzip(gzip('hello world')), 'UTF8');
+-- Result: hello world
+
+SELECT convert_from(gunzip_ng(gzip_ng('hello world')), 'UTF8');
+-- Result: hello world
+
+SELECT convert_from(gunzip_ng(gzip('hello world')), 'UTF8');
+-- Result: hello world
+
+SELECT convert_from(gunzip(gzip_ng('hello world')), 'UTF8');
 -- Result: hello world
 ```
 

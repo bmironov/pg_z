@@ -1,0 +1,112 @@
+CREATE EXTENSION IF NOT EXISTS pg_z;
+-- deflate_ng function tests
+SELECT deflate_ng(NULL) AS deflate_ng_null;
+ deflate_ng_null 
+-----------------
+ 
+(1 row)
+
+SELECT deflate_ng('') AS deflate_ng_blank;
+ deflate_ng_blank 
+------------------
+ \x
+(1 row)
+
+SELECT deflate_ng('\x00'::bytea) AS deflate_ng_zero;
+ deflate_ng_zero 
+-----------------
+ \x630000
+(1 row)
+
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog') AS deflate_ng_default;
+                                      deflate_ng_default                                      
+----------------------------------------------------------------------------------------------
+ \x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228c94855c849acaa5448c94f0700
+(1 row)
+
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog'::bytea) AS deflate_ng_default;
+                                      deflate_ng_default                                      
+----------------------------------------------------------------------------------------------
+ \x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228c94855c849acaa5448c94f0700
+(1 row)
+
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog'::text) AS deflate_ng_default;
+                                      deflate_ng_default                                      
+----------------------------------------------------------------------------------------------
+ \x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228c94855c849acaa5448c94f0700
+(1 row)
+
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog'::bytea, 8) AS deflate_ng_8;
+                                         deflate_ng_8                                         
+----------------------------------------------------------------------------------------------
+ \x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228c94855c849acaa5448c94f0700
+(1 row)
+
+WITH str AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', 10000) AS str
+)
+SELECT convert_from(inflate_ng(deflate_ng(str)), 'utf8') = str AS inflate_ng_long FROM str;
+ inflate_ng_long 
+-----------------
+ t
+(1 row)
+
+WITH strs AS (
+    SELECT repeat('The quick brown fox jumps over the lazy dog', generate_series(1, 1000)) AS str
+)
+SELECT sum((str = convert_from(inflate_ng(deflate_ng(str)), 'utf8'))::integer) AS inflate_ng_strings
+FROM strs;
+ inflate_ng_strings 
+--------------------
+               1000
+(1 row)
+
+-- incorrect compression_level (out of range -1..9) should cause error
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog'::bytea, -2) AS deflate_ng_err_1;
+ERROR:  invalid compression level (outside of -1..9): -2
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog'::bytea, 10) AS deflate_ng_err_2;
+ERROR:  invalid compression level (outside of -1..9): 10
+-- inflate_ng function tests
+SELECT convert_from(inflate_ng(deflate_ng('The quick brown fox jumps over the lazy dog')), 'utf8') AS inflate_ng_ok;
+                inflate_ng_ok                
+---------------------------------------------
+ The quick brown fox jumps over the lazy dog
+(1 row)
+
+SELECT inflate_ng(''::bytea) AS inflate_ng_blank;
+ inflate_ng_blank 
+------------------
+ \x
+(1 row)
+
+SELECT inflate_ng('\x00'::bytea) AS inflate_ng_8;
+ERROR:  error during decompression: -5
+SELECT inflate_ng('\x0000'::bytea) AS inflate_ng_16;
+ERROR:  error during decompression: -5
+SELECT inflate_ng('fubar'::bytea) AS inflate_ng_16;
+ERROR:  error during decompression: -3
+SELECT inflate_ng(deflate_ng('\x00000000000000000000'::bytea)) AS deflate_ng_roundtrip_zero;
+ deflate_ng_roundtrip_zero 
+---------------------------
+ \x00000000000000000000
+(1 row)
+
+-- error propagation
+SELECT inflate_ng(deflate_ng('The quick brown fox jumps over the lazy dog'::bytea, -2)) AS inflate_ng_err_1;
+ERROR:  invalid compression level (outside of -1..9): -2
+SELECT inflate_ng(deflate_ng('The quick brown fox jumps over the lazy dog'::bytea, 10)) AS inflate_ng_err_2;
+ERROR:  invalid compression level (outside of -1..9): 10
+-- check limit set by DB parameter
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = 10;
+SELECT deflate_ng('The quick brown fox jumps over the lazy dog') AS deflate_ng_overlimit;
+ERROR:  input data is limited by pg_z.max_size (10 bytes)
+SELECT convert_from(inflate_ng('\x0bc94855282ccd4cce56482aca2fcf5348cbaf50c82acd2d2856c82f4b2d5228014ae72456552aa4e4a70300'::bytea), 'UTF8') AS inflate_ng_overlimit;
+ERROR:  decompressed output exceeds pg_z.max_size (10 bytes)
+RESET pg_z.max_size;
+DROP EXTENSION pg_z;

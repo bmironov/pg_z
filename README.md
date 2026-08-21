@@ -2,12 +2,18 @@
 
 <!-- toc -->
 
+- [Highlights of `pg_z` extension](#highlights-of-pg_z-extension)
+    * [Zero-Copy Architecture](#zero-copy-architecture)
+    * [Decompression Bomb Protection and Size Estimation](#decompression-bomb-protection-and-size-estimation)
+    * [PostgreSQL-Integrated Memory Management & Parallel Safety](#postgresql-integrated-memory-management--parallel-safety)
+    * [Static Huge Pages Support](#static-huge-pages-support)
+    * [Tuple-Scoped Context Lifecycle](#tuple-scoped-context-lifecycle)
+- [Data-Flow with `pg_z`](#data-flow-with-pg_z)
 - [Requirements and Configuration](#requirements-and-configuration)
 - [Database Parameters](#database-parameters)
     * [`pg_z.max_size`](#pg_zmax_size)
     * [`pg_z.mem_chunk_size`](#pg_zmem_chunk_size)
 - [Functions Provided by This Extension](#functions-provided-by-this-extension)
-- [Data-Flow with `pg_z`](#data-flow-with-pg_z)
 - [Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`](#usage-of-postgresql-v18-ability-to-install-extensions-without-sudo)
 - [Compiling the Extension with Debug Information](#compiling-the-extension-with-debug-information)
 - [Supplied Unit Tests for the `pg_z` Functions](#supplied-unit-tests-for-the-pg_z-functions)
@@ -19,12 +25,6 @@
     * [Running the Load Test](#running-the-load-test)
     * [Load Test Dataset Characteristics](#load-test-dataset-characteristics)
     * [Sample Load Test Execution Output](#sample-load-test-execution-output)
-- [Highlights of `pg_z` extension](#highlights-of-pg_z-extension)
-    * [Zero-Copy Architecture](#zero-copy-architecture)
-    * [Decompression Bomb Protection and Size Estimation](#decompression-bomb-protection-and-size-estimation)
-    * [PostgreSQL-Integrated Memory Management & Parallel Safety](#postgresql-integrated-memory-management--parallel-safety)
-    * [Static Huge Pages Support](#static-huge-pages-support)
-    * [Tuple-Scoped Context Lifecycle](#tuple-scoped-context-lifecycle)
 - [Preparing Static Huge Memory Pages (HMP) on the System](#preparing-static-huge-memory-pages-hmp-on-the-system)
 - [How to Pronounce `pg_z`](#how-to-pronounce-pg_z)
 
@@ -43,6 +43,71 @@ to use modern compression algorithms (`LZ4`, `Zstandard`) to minimize the CPU
 load during data retrieval. This approach provides a better storage efficiency
 at the cost of slightly higher CPU usage during compression.
 
+## Highlights of `pg_z` extension
+
+### Zero-Copy Architecture
+
+The extension uses a zero-copy methodology where results accumulate directly
+within a single memory region. This eliminates the need to copy data to another
+buffer before returning it to the requester. This approach provides significant
+performance benefits when processing multi-megabyte documents such as log
+files, JSON, or XML.
+
+Brotli decompression is an exception here because compressed streams lack
+upfront uncompressed size information and require a consistent dictionary
+window for back-references. To ensure stability and prevent memory corruption,
+the engine pairs a best-guess initial allocation with optimized streaming
+through a temporary buffer. This approach compromises pure zero-copy design for
+Brotli to guarantee memory safety and predictable performance.
+
+### Decompression Bomb Protection and Size Estimation
+
+Extra care is taken to prevent "decompression bombs" in the `gunzip` function.
+Because the Gzip standard does not embed the original data size, standard
+implementations are prone to either memory under-allocation or massive
+over-allocation for highly compressed payloads. To solve this, `gunzip`
+processes data using a `do-while` loop combined with dynamic `repalloc` calls.
+
+Additionally, both `gzip` and `gunzip` employ rough initial size estimates.
+This optimization prevents frequent memory reallocations for large documents —
+a common performance bottleneck when a small, static chunk size is used from
+the start. The implementation carefully balances this initial chunk size to
+ensure high performance for both small and large documents.
+
+### PostgreSQL-Integrated Memory Management & Parallel Safety
+
+All supported compression algorithms (`brotli`, `gzip`, `lz4`, and `zstd`)
+leverage custom allocators tied directly into the PostgreSQL memory manager.
+This architecture prevents memory leaks and enables specialized allocation
+optimizations.
+
+As a result, `brotli`, `gzip`, `lz4` and `snappy` functions are safely marked
+as **`PARALLEL SAFE`**. However, because `zstd` manages its own internal
+threads outside of PostgreSQL's control, `zstd`-related functions are marked as
+**`PARALLEL UNSAFE`**.
+
+### Static Huge Pages Support
+
+The extension's custom memory manager supports the allocation of Static Huge
+Pages. This dramatically boosts performance for large documents by allocating
+memory in 2 MB chunks instead of standard 4 KB pages, significantly reducing
+TLB cache misses.
+
+### Tuple-Scoped Context Lifecycle
+
+The custom [Memory Manager][6] is attached to **`CurrentMemoryContext`**, which
+lives only for the duration of processing a single tuple. Once the tuple is
+processed, all memory allocated by the extension's functions is automatically
+freed. This approach is highly resource-efficient compared to attaching
+allocations to the **Transaction Context**, where a single transaction
+processing millions of tuples would otherwise cause massive memory bloat.
+
+## Data-Flow with `pg_z`
+
+The documentation in [DATA_FLOW.md][5] outlines the data flow and database
+environment necessary for processing large documents. It provides both a visual
+diagram and a configuration example to support this functionality.
+
 ## Requirements and Configuration
 
 The `pg_z` extension compiles into a hybrid-linked `.so` shared library. To
@@ -50,7 +115,7 @@ support the full set of compression algorithms, the following libraries and
 their development headers should be installed on the build system:
 
 - `brotli`;
-- `zlib` (for `gzip` and `deflate` algorithms);
+- `zlib` and/or `zlib-ng` (for `gzip` and `deflate` algorithms);
 - `lz4`;
 - `snappy`;
 - `zstd`.
@@ -138,18 +203,14 @@ compression algorithms, arranged in alphabetical order:
 | [Brotli][7] | `brotli` | `unbrotli` |
 | [Deflate][8] | `deflate` | `inflate` |
 | [Gzip][8] | `gzip` | `gunzip` (aka `ungzip`) |
+| Deflate ([zlib-ng][14]) | `deflate_ng` | `inflate_ng` |
+| Gzip ([zlib-ng][14]) | `gzip_ng` | `gunzip_ng` (aka `ungzip_ng`) |
 | [LZ4][9] | `lz4` | `unlz4` |
 | [Snappy][10] | `snappy` | `unsnappy` |
 | [Zstandard][11] | `zstd` | `unzstd` |
 
 Detailed definitions and usage examples for these functions can be found in
 [USAGE.md][4].
-
-## Data-Flow with `pg_z`
-
-The documentation in [DATA_FLOW.md][5] outlines the data flow and database
-environment necessary for processing large documents. It provides both a visual
-diagram and a configuration example to support this functionality.
 
 ## Usage of PostgreSQL v18+ Ability to Install Extensions Without `sudo`
 
@@ -221,11 +282,13 @@ ok 2         - db_params                                  12 ms
 ok 3         - brotli                                     49 ms
 ok 4         - gzip                                       67 ms
 ok 5         - deflate                                    62 ms
-ok 6         - lz4                                        27 ms
-ok 7         - snappy                                     23 ms
-ok 8         - zstd                                       38 ms
-1..8
-# All 8 tests passed.
+ok 6         - gzip_ng                                    30 ms
+ok 7         - deflate_ng                                 29 ms
+ok 8         - lz4                                        27 ms
+ok 9         - snappy                                     23 ms
+ok 10        - zstd                                       38 ms
+1..10
+# All 10 tests passed.
 ```
 
 Since the tests are similar in nature, the difference in execution time between
@@ -287,29 +350,35 @@ Prepared following test data set:
   115,088,895       | 110 MB
 (1 row)
 
---------------+----------------------+--------------+-----------
-Test #/Result | Algorithm / Function | Result, bytes| Duration
---------------+----------------------+--------------+-----------
-  1 OK        | brotli compress      |      307,976 |    154 ms
-  2 OK        | brotli decompress    |  115,088,895 |  5,512 ms
---------------+----------------------+--------------+-----------
-  3 OK        | gzip compress        |      957,968 |    364 ms
-  4 OK        | gzip decompress      |  115,088,895 |  5,647 ms
---------------+----------------------+--------------+-----------
-  5 OK        | deflate compress     |      957,950 |    348 ms
-  6 OK        | deflate decompress   |  115,088,895 |  5,589 ms
---------------+----------------------+--------------+-----------
-  7 OK        | lz4 compress         |    1,401,239 |    211 ms
-  8 OK        | lz4 decompress       |  115,088,895 |     51 ms
---------------+----------------------+--------------+-----------
-  9 OK        | snappy compress      |    6,712,722 |     73 ms
- 10 OK        | snappy decompress    |  115,088,895 |  5,195 ms
---------------+----------------------+--------------+-----------
- 11 OK        | zstd compress        |      313,561 |    168 ms
- 12 OK        | zstd decompress      |  115,088,895 |     56 ms
---------------+----------------------+--------------+-----------
-1..12
-# All 12 benchmarks passed.
+--------------+-----------------------+--------------+-----------
+Test #/Result | Algorithm / Function  | Result, bytes| Duration
+--------------+-----------------------+--------------+-----------
+  1 OK        | brotli compress       |      307,976 |    154 ms
+  2 OK        | brotli decompress     |  115,088,895 |  5,512 ms
+--------------+-----------------------+--------------+-----------
+  3 OK        | gzip compress         |      957,968 |    364 ms
+  4 OK        | gzip decompress       |  115,088,895 |  5,647 ms
+--------------+-----------------------+--------------+-----------
+  5 OK        | deflate compress      |      957,950 |    348 ms
+  6 OK        | deflate decompress    |  115,088,895 |  5,589 ms
+--------------+-----------------------+--------------+-----------
+  7 OK        | gzip_ng compress      |      946,664 |    141 ms
+  8 OK        | gzip_ng decompress    |  115,088,895 |  5,543 ms
+--------------+-----------------------+--------------+-----------
+  9 OK        | deflate_ng compress   |      946,646 |    139 ms
+ 10 OK        | deflate_ng decompress |  115,088,895 |  5,570 ms
+--------------+-----------------------+--------------+-----------
+ 11 OK        | lz4 compress          |    1,401,239 |    208 ms
+ 12 OK        | lz4 decompress        |  115,088,895 |     48 ms
+--------------+-----------------------+--------------+-----------
+ 13 OK        | snappy compress       |    6,712,726 |     71 ms
+ 14 OK        | snappy decompress     |  115,088,895 |  5,401 ms
+--------------+-----------------------+--------------+-----------
+ 15 OK        | zstd compress         |      312,367 |    151 ms
+ 16 OK        | zstd decompress       |  115,088,895 |     52 ms
+--------------+-----------------------+--------------+-----------
+1..16
+# All 16 benchmarks passed.
 Cleaning up benchmark environment...
 ```
 
@@ -367,24 +436,32 @@ Test #/Result | Algorithm / Function | Result, bytes| Duration
   7 OK        | deflate-1            |      964,190 |    175 ms
   8 OK        | deflate-6            |      957,950 |    379 ms
   9 OK        | deflate-9            |      957,950 |    401 ms
+----gzip_ng single-threaded----------+--------------+-----------
+ 10 OK        | gzip_ng-1            |    1,723,419 |     76 ms
+ 11 OK        | gzip_ng-6            |      946,663 |    144 ms
+ 12 OK        | gzip_ng-9            |      957,968 |    235 ms
+----deflate_ng single-threaded-------+--------------+-----------
+ 13 OK        | deflate_ng-1         |    1,723,401 |     80 ms
+ 14 OK        | deflate_ng-6         |      946,645 |    141 ms
+ 15 OK        | deflate_ng-9         |      957,950 |    230 ms
 ----lz4 single-threaded--------------+--------------+-----------
- 10 OK        | lz4-0                |    1,513,810 |     60 ms
- 11 OK        | lz4-5                |    1,401,239 |    211 ms
- 12 OK        | lz4-16               |    1,403,227 |  1,243 ms
+ 16 OK        | lz4-0                |    1,513,806 |     61 ms
+ 17 OK        | lz4-5                |    1,401,239 |    210 ms
+ 18 OK        | lz4-16               |    1,403,227 |  1,238 ms
 ----snappy single-threaded-----------+--------------+-----------
- 13 OK        | snappy               |    6,712,723 |     72 ms
+ 19 OK        | snappy               |    6,712,726 |     70 ms
 ----zstd single-threaded-------------+--------------+-----------
- 14 OK        | zstd-1               |      393,722 |     64 ms
- 15 OK        | zstd-7               |      312,368 |    163 ms
- 16 OK        | zstd-19              |      310,781 | 18,396 ms
+ 20 OK        | zstd-1               |      393,722 |     69 ms
+ 21 OK        | zstd-7               |      313,399 |    149 ms
+ 22 OK        | zstd-19              |      310,747 | 16,853 ms
 ----zstd multi-threaded--------------+--------------+-----------
- 17 OK        | zstd-7-1             |      312,368 |    162 ms
- 18 OK        | zstd-7-2             |      312,368 |    160 ms
- 19 OK        | zstd-7-4             |      312,368 |    161 ms
- 20 OK        | zstd-7-8             |      312,368 |    161 ms
+ 23 OK        | zstd-7-1             |      313,399 |    156 ms
+ 24 OK        | zstd-7-2             |      313,399 |    150 ms
+ 25 OK        | zstd-7-4             |      313,399 |    149 ms
+ 26 OK        | zstd-7-8             |      313,399 |    150 ms
 --------------+----------------------+--------------+-----------
-1..20
-# All 20 benchmarks passed.
+1..26
+# All 26 benchmarks passed.
 Cleaning up benchmark environment...
 ```
 
@@ -398,65 +475,6 @@ required compression algorithms out of the configured list:
 ```bash
 make load_test "lz4 zstd"
 ```
-
-## Highlights of `pg_z` extension
-
-### Zero-Copy Architecture
-
-The extension uses a zero-copy methodology where results accumulate directly
-within a single memory region. This eliminates the need to copy data to another
-buffer before returning it to the requester. This approach provides significant
-performance benefits when processing multi-megabyte documents such as log
-files, JSON, or XML.
-
-Brotli decompression is an exception here because compressed streams lack
-upfront uncompressed size information and require a consistent dictionary
-window for back-references. To ensure stability and prevent memory corruption,
-the engine pairs a best-guess initial allocation with optimized streaming
-through a temporary buffer. This approach compromises pure zero-copy design for
-Brotli to guarantee memory safety and predictable performance.
-
-### Decompression Bomb Protection and Size Estimation
-
-Extra care is taken to prevent "decompression bombs" in the `gunzip` function.
-Because the Gzip standard does not embed the original data size, standard
-implementations are prone to either memory under-allocation or massive
-over-allocation for highly compressed payloads. To solve this, `gunzip`
-processes data using a `do-while` loop combined with dynamic `repalloc` calls.
-
-Additionally, both `gzip` and `gunzip` employ rough initial size estimates.
-This optimization prevents frequent memory reallocations for large documents —
-a common performance bottleneck when a small, static chunk size is used from
-the start. The implementation carefully balances this initial chunk size to
-ensure high performance for both small and large documents.
-
-### PostgreSQL-Integrated Memory Management & Parallel Safety
-
-All supported compression algorithms (`brotli`, `gzip`, `lz4`, and `zstd`)
-leverage custom allocators tied directly into the PostgreSQL memory manager.
-This architecture prevents memory leaks and enables specialized allocation
-optimizations.
-
-As a result, `brotli`, `gzip`, `lz4` and `snappy` functions are safely marked
-as **`PARALLEL SAFE`**. However, because `zstd` manages its own internal
-threads outside of PostgreSQL's control, `zstd`-related functions are marked as
-**`PARALLEL UNSAFE`**.
-
-### Static Huge Pages Support
-
-The extension's custom memory manager supports the allocation of Static Huge
-Pages. This dramatically boosts performance for large documents by allocating
-memory in 2 MB chunks instead of standard 4 KB pages, significantly reducing
-TLB cache misses.
-
-### Tuple-Scoped Context Lifecycle
-
-The custom [Memory Manager][6] is attached to **`CurrentMemoryContext`**, which
-lives only for the duration of processing a single tuple. Once the tuple is
-processed, all memory allocated by the extension's functions is automatically
-freed. This approach is highly resource-efficient compared to attaching
-allocations to the **Transaction Context**, where a single transaction
-processing millions of tuples would otherwise cause massive memory bloat.
 
 ## Preparing Static Huge Memory Pages (HMP) on the System
 
@@ -514,3 +532,4 @@ a universal reference to compression as in `.Z` file type.
 [11]: https://github.com/facebook/zstd
 [12]: CONFIGURE.md
 [13]: https://github.com/cloudnative-pg
+[14]: https://github.com/zlib-ng/zlib-ng

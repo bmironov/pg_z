@@ -1,5 +1,5 @@
 # Variables replaced by configure script for dynamic linking
-DYNAMIC_LIBS       = @DYNAMIC_LIBS@
 STATIC_LIBS        = @STATIC_LIBS@
+DYNAMIC_LIBS       = @DYNAMIC_LIBS@
 CONFIGURE_RUN      = @CONFIGURE_RUN@
 COMPRESSION_CFLAGS = @COMPRESSION_CFLAGS@

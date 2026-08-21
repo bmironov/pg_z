@@ -19,10 +19,10 @@ trap cleanup EXIT
 rm -f ${RESULTS}/*
 psql -q -v ON_ERROR_STOP=1 -f ${SCRIPTS}/prepare.sql
 
-echo "--------------+----------------------+--------------+-----------"
-echo "Test #/Result | Algorithm / Function | Result, bytes| Duration"
+echo "--------------+-----------------------+--------------+-----------"
+echo "Test #/Result | Algorithm / Function  | Result, bytes| Duration"
 for ALGO in $BENCHMARK_ALGOS; do
-    echo "--------------+----------------------+--------------+-----------"
+    echo "--------------+-----------------------+--------------+-----------"
     for PHASE in save compress decompress; do
         TEST=${ALGO}_${PHASE}
         FUNC="${ALGO}"
@@ -31,7 +31,9 @@ for ALGO in $BENCHMARK_ALGOS; do
             true
             ;;
         decompress)
+            FUNC="un$ALGO"
             [ "$ALGO" == "deflate" ] && FUNC="inflate"
+            [ "$ALGO" == "deflate_ng" ] && FUNC="inflate_ng"
             ;;
         *)
             echo "!!! Unknown benchmark phase ${PHASE}"
@@ -40,7 +42,7 @@ for ALGO in $BENCHMARK_ALGOS; do
         esac
 
         SQL=${SCRIPTS}/${PHASE}.sql
-        OUT=${RESULTS}/${PHASE}.out
+        OUT=${RESULTS}/${TEST}.out
 
         if [ -f "$SQL" ]; then
             START_TIME=$(date +%s%3N)
@@ -55,9 +57,9 @@ for ALGO in $BENCHMARK_ALGOS; do
 
             BYTES=$(sed -n '3p' $OUT)
             if [ $STATUS -eq 0 ]; then
-                printf "%3d OK        | %-20s | %'12d | %'6d ms\n" ${COUNT} "${ALGO} ${PHASE}" ${BYTES} ${DURATION}
+                printf "%3d OK        | %-21s | %'12d | %'6d ms\n" ${COUNT} "${ALGO} ${PHASE}" ${BYTES} ${DURATION}
             else
-                printf "%3d ERROR %3d | %-20s | %'12d | %'6d ms\n" ${COUNT} ${STATUS} "${ALGO} ${PHASE}" 0 ${DURATION}
+                printf "%3d ERROR %3d | %-21s | %'12d | %'6d ms\n" ${COUNT} ${STATUS} "${ALGO} ${PHASE}" 0 ${DURATION}
                 FAILED=$((FAILED + 1))
             fi
 
@@ -65,7 +67,7 @@ for ALGO in $BENCHMARK_ALGOS; do
         fi
     done
 done
-echo "--------------+----------------------+--------------+-----------"
+echo "--------------+-----------------------+--------------+-----------"
 
 TOTAL=$((COUNT - 1))
 echo "1..${TOTAL}"

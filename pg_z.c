@@ -107,6 +107,13 @@ pg_z_version(PG_FUNCTION_ARGS)
 	first = false;
 #endif
 
+#ifdef USE_gzip_ng
+	if (!first)
+		strcat(buf, ", ");
+	strcat(buf, "gzip-ng, deflate-ng");
+	first = false;
+#endif
+
 #ifdef USE_lz4
 	if (!first)
 		strcat(buf, ", ");

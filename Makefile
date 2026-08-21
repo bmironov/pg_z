@@ -4,7 +4,7 @@ MODULE_big = pg_z
 
 BUILD_DIR = tmp
 SRC_MODULES = pg_z mem_manager
-ALGO_MODULES = brotli gzip lz4 snappy zstd
+ALGO_MODULES = brotli gzip gzip_ng lz4 snappy zstd
 
 -include $(top_srcdir)/Makefile.port Makefile.port ../Makefile.port
 
@@ -13,8 +13,12 @@ ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(COMPRESSION_CFLAGS))
 REGRESS += $(ACTIVE_ALGOS)
 
 # Now we can add "deflate" if gzip is present for all tests to run
-REGRESS := $(subst gzip,gzip deflate,$(REGRESS))
-BENCHMARK_ALGOS := $(subst gzip,gzip deflate,$(ACTIVE_ALGOS))
+empty :=
+space := $(empty) $(empty)
+REGRESS := $(subst gzip$(space),gzip deflate$(space),$(REGRESS))
+REGRESS := $(subst gzip_ng$(space),gzip_ng deflate_ng$(space),$(REGRESS))
+BENCHMARK_ALGOS := $(subst gzip_ng$(space),gzip_ng deflate_ng$(space),$(ACTIVE_ALGOS))
+BENCHMARK_ALGOS := $(subst gzip$(space),gzip deflate$(space),$(BENCHMARK_ALGOS))
 
 export ACTIVE_ALGOS
 export BENCHMARK_ALGOS
@@ -71,9 +75,10 @@ endif
 
 OBJS = $(addsuffix .o, $(SRC_MODULES)) $(addsuffix .o, $(ACTIVE_ALGOS))
 
-$(info OBJS:         $(OBJS))
-$(info REGRESS:      $(REGRESS))
-$(info ACTIVE_ALGOS: $(ACTIVE_ALGOS))
+$(info OBJS:            $(OBJS))
+$(info REGRESS:         $(REGRESS))
+$(info ACTIVE_ALGOS:    $(ACTIVE_ALGOS))
+$(info BENCHMARK_ALGOS: $(BENCHMARK_ALGOS))
 
 ifdef DEBUG_BUILD
 	PG_CFLAGS += -g3 -O0
@@ -87,6 +92,9 @@ else
 	SHLIB_LINK += -flto
 	STRIP_CMD = strip --strip-unneeded $(shlib)
 endif
+
+$(info STATIC_LIBS:  $(STATIC_LIBS))
+$(info DYNAMIC_LIBS: $(DYNAMIC_LIBS))
 
 PG_CFLAGS += $(COMPRESSION_CFLAGS)
 

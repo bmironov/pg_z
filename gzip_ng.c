@@ -1,21 +1,21 @@
 #include "pg_z.h"
 
-#include <zlib.h>
+#include <zlib-ng.h>
 
-PG_FUNCTION_INFO_V1(pg_deflate);
-PG_FUNCTION_INFO_V1(pg_gzip);
-PG_FUNCTION_INFO_V1(pg_inflate);
-PG_FUNCTION_INFO_V1(pg_gunzip);
+PG_FUNCTION_INFO_V1(pg_deflate_ng);
+PG_FUNCTION_INFO_V1(pg_gzip_ng);
+PG_FUNCTION_INFO_V1(pg_inflate_ng);
+PG_FUNCTION_INFO_V1(pg_gunzip_ng);
 
-#define MY_COMPRESS pg_zlib_compress
-#define MY_DECOMPRESS pg_zlib_decompress
-#define MY_Z_STREAM z_stream
-#define MY_DEFLATE_INIT2 deflateInit2
-#define MY_DEFLATE deflate
-#define MY_DEFLATE_END deflateEnd
-#define MY_INFLATE_INIT2 inflateInit2
-#define MY_INFLATE inflate
-#define MY_INFLATE_END inflateEnd
+#define MY_COMPRESS pg_zlib_ng_compress
+#define MY_DECOMPRESS pg_zlib_ng_decompress
+#define MY_Z_STREAM zng_stream
+#define MY_DEFLATE_INIT2 zng_deflateInit2
+#define MY_DEFLATE zng_deflate
+#define MY_DEFLATE_END zng_deflateEnd
+#define MY_INFLATE_INIT2 zng_inflateInit2
+#define MY_INFLATE zng_inflate
+#define MY_INFLATE_END zng_inflateEnd
 #include "gzip_common.h"
 #undef MY_INFLATE_END
 #undef MY_INFLATE
@@ -32,7 +32,7 @@ PG_FUNCTION_INFO_V1(MY_DECOMPRESS);
  */
 
 Datum
-pg_deflate(PG_FUNCTION_ARGS)
+pg_deflate_ng(PG_FUNCTION_ARGS)
 {
 	Datum input = PG_GETARG_DATUM(0);
 	Datum compression_level = PG_GETARG_DATUM(1);
@@ -60,7 +60,7 @@ pg_deflate(PG_FUNCTION_ARGS)
  */
 
 Datum
-pg_gzip(PG_FUNCTION_ARGS)
+pg_gzip_ng(PG_FUNCTION_ARGS)
 {
 	Datum input = PG_GETARG_DATUM(0);
 	Datum compression_level = PG_GETARG_DATUM(1);
@@ -88,7 +88,7 @@ pg_gzip(PG_FUNCTION_ARGS)
  */
 
 Datum
-pg_inflate(PG_FUNCTION_ARGS)
+pg_inflate_ng(PG_FUNCTION_ARGS)
 {
 	Datum input = PG_GETARG_DATUM(0);
 
@@ -114,7 +114,7 @@ pg_inflate(PG_FUNCTION_ARGS)
  */
 
 Datum
-pg_gunzip(PG_FUNCTION_ARGS)
+pg_gunzip_ng(PG_FUNCTION_ARGS)
 {
 	Datum input = PG_GETARG_DATUM(0);
 

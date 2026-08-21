@@ -17,51 +17,53 @@ fi
 
 # Enable/Disable specific compression algorithms (default: yes)
 AC_ARG_WITH([brotli],
-            [AS_HELP_STRING([--with-brotli], [include Brotli support (yes/no) [default=yes]])],
+            [AS_HELP_STRING([--with-brotli],  [include Brotli support (yes/no) [default=yes]])],
             [with_brotli=$withval],
             [with_brotli=yes])
 AC_ARG_WITH([gzip],
-            [AS_HELP_STRING([--with-gzip],   [include Gzip/Deflate support (yes/no) [default=yes]])],
+            [AS_HELP_STRING([--with-gzip],    [include Gzip/Deflate support via standard zlib (yes/no) [default=yes]])],
             [with_gzip=$withval],
             [with_gzip=yes])
+AC_ARG_WITH([gzip-ng],
+            [AS_HELP_STRING([--with-gzip-ng], [include Gzip/Deflate support via zlib-ng (yes/no) [default=yes]])],
+            [with_gzip_ng=$withval],
+            [with_gzip_ng=yes])
 AC_ARG_WITH([lz4],
-            [AS_HELP_STRING([--with-lz4],    [include LZ4 support (yes/no) [default=yes]])],
+            [AS_HELP_STRING([--with-lz4],     [include LZ4 support (yes/no) [default=yes]])],
             [with_lz4=$withval],
             [with_lz4=yes])
 AC_ARG_WITH([snappy],
-            [AS_HELP_STRING([--with-snappy], [include Snappy support (yes/no) [default=yes]])],
+            [AS_HELP_STRING([--with-snappy],  [include Snappy support (yes/no) [default=yes]])],
             [with_snappy=$withval],
             [with_snappy=yes])
 AC_ARG_WITH([zstd],
-            [AS_HELP_STRING([--with-zstd],   [include Zstandard support (yes/no) [default=yes]])],
+            [AS_HELP_STRING([--with-zstd],    [include Zstandard support (yes/no) [default=yes]])],
             [with_zstd=$withval],
             [with_zstd=yes])
 
-# Select Gzip optimization engine backend (zlib or zlib-ng)
-AC_ARG_WITH([zlib-backend],
-            [AS_HELP_STRING([--with-zlib-backend=zlib|zlib-ng], [select Gzip engine backend [default=zlib-ng]])],
-            [with_zlib_backend=$withval],
-            [with_zlib_backend=zlib-ng])
-
 # Choose linking type (static or dynamic) for each library
 AC_ARG_WITH([link-brotli],
-            [AS_HELP_STRING([--with-link-brotli=static|dynamic], [linking type for Brotli [default: static]])],
+            [AS_HELP_STRING([--with-link-brotli=static|dynamic],  [linking type for Brotli [default: static]])],
             [BROTLI=$withval],
             [BROTLI=static])
 AC_ARG_WITH([link-gzip],
-            [AS_HELP_STRING([--with-link-gzip=static|dynamic],   [linking type for Gzip/Deflate [default=dynamic]])],
+            [AS_HELP_STRING([--with-link-gzip=static|dynamic],    [linking type for Gzip/Deflate (zlib) [default=dynamic]])],
             [ZLIB=$withval],
             [ZLIB=dynamic])
+AC_ARG_WITH([link-gzip-ng],
+            [AS_HELP_STRING([--with-link-gzip-ng=static|dynamic], [linking type for Gzip/Deflate (zlib-ng) [default=static]])],
+            [ZLIB_NG=$withval],
+            [ZLIB_NG=static])
 AC_ARG_WITH([link-lz4],
-            [AS_HELP_STRING([--with-link-lz4=static|dynamic],    [linking type for LZ4 [default=static]])],
+            [AS_HELP_STRING([--with-link-lz4=static|dynamic],     [linking type for LZ4 [default=static]])],
             [LZ4=$withval],
             [LZ4=static])
 AC_ARG_WITH([link-snappy],
-            [AS_HELP_STRING([--with-link-snappy=static|dynamic], [linking type for Snappy [default: dynamic on Debian, static elsewhere]])],
+            [AS_HELP_STRING([--with-link-snappy=static|dynamic],  [linking type for Snappy [default: dynamic on Debian, static elsewhere]])],
             [SNAPPY=$withval],
             [SNAPPY=default])
 AC_ARG_WITH([link-zstd],
-            [AS_HELP_STRING([--with-link-zstd=static|dynamic],   [linking type for Zstandard [default=static]])],
+            [AS_HELP_STRING([--with-link-zstd=static|dynamic],    [linking type for Zstandard [default=static]])],
             [ZSTD=$withval],
             [ZSTD=static])
 
@@ -76,21 +78,14 @@ AS_IF([test "x$is_debian" = "xyes"], [
         default) SNAPPY=dynamic ;;
         static)  AC_MSG_ERROR([Snappy can only be linked dynamically on Debian/Ubuntu due to missing static archives. Please use --with-link-snappy=dynamic]) ;;
     esac
+    case "$ZLIB" in
+        default) ZLIB=dynamic ;;
+        static) AC_MSG_ERROR([Standard zlib can only be linked dynamically on Debian/Ubuntu due to missing -fPIC. Please use --with-link-gzip=dynamic]) ;;
+    esac
 ], [
     AS_IF([test "x$SNAPPY" = "xdefault"], [SNAPPY=static])
 ])
 
-# Validate Gzip combinations based on selected engine backend
-AS_IF([test "x$with_gzip" = "xyes"], [
-    AS_IF([test "x$with_zlib_backend" = "xzlib-ng"], [
-        : # Zlib-ng allows both static and dynamic
-    ], [
-        # Standard legacy zlib can only be linked dynamically on Debian
-        AS_IF([test "$ZLIB" = "static" && test "x$is_debian" = "xyes"], [
-            AC_MSG_ERROR([Standard zlib can only be linked dynamically on Debian/Ubuntu due to missing -fPIC. Use --with-zlib-backend=zlib-ng for static linking, or set --with-link-gzip=dynamic])
-        ])
-    ])
-])
 
 
 SUPPORT_BROTLI="-- "
@@ -137,7 +132,7 @@ AC_DEFUN([AC_CHECK_STATIC_LIB], [
 # CONDITIONAL ALGORITHM VERIFICATION
 # ===========================================================================
 
-# --- BROTLI ---
+# --- Brotli ---
 AS_IF([test "x$with_brotli" = "xyes"], [
     AS_IF([test "$BROTLI" = "static"], [
         AC_CHECK_STATIC_LIB([brotli/encode.h],            [brotlienc])
@@ -148,63 +143,58 @@ AS_IF([test "x$with_brotli" = "xyes"], [
         AC_CHECK_DYNAMIC_LIB([brotlienc],    [BrotliEncoderCreateInstance],          [libbrotli])
         AC_CHECK_DYNAMIC_LIB([brotlidec],    [BrotliDecoderCreateInstance],          [libbrotli])
     ])
-    COMPRESSION_CFLAGS="$COMPRESSION_CFLAGS -DUSE_brotli"
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
 ])
 
-# --- GZIP / DEFLATE ---
+# --- Gzip / Deflate ---
+# Process standard legacy Zlib engine
 AS_IF([test "x$with_gzip" = "xyes"], [
-    AS_IF([test "x$with_zlib_backend" = "xzlib-ng"], [
-        # Process hardware-accelerated Zlib-ng engine
-        AS_IF([test "$ZLIB" = "static"], [
-            AC_CHECK_STATIC_LIB([zlib.h], [z-zlib-ng])
-        ], [
-            AC_CHECK_LIB([z-zlib-ng], [zlibCompileFlags], [
-                AS_VAR_APPEND([DYNAMIC_LIBS], [" -lz-zlib-ng"])
-            ], [
-                # Check fallback if zlib-ng is configured as transparent drop-in for libz
-                AC_CHECK_DYNAMIC_LIB([z], [zlibCompileFlags], [zlib1g-dev-zlib-ng])
-            ])
-        ])
-        if test -d /usr/include/zlib-ng; then COMPRESSION_CFLAGS="$COMPRESSION_CFLAGS -I/usr/include/zlib-ng"; fi
+    AS_IF([test "$ZLIB" = "static"], [
+        AC_CHECK_STATIC_LIB([zlib.h], [z])
     ], [
-        # Process standard legacy Zlib engine
-        AS_IF([test "$ZLIB" = "static"], [
-            AC_CHECK_STATIC_LIB([zlib.h], [z])
-        ], [
-            AC_CHECK_DYNAMIC_LIB([z], [deflate], [zlib])
-        ])
+        AC_CHECK_DYNAMIC_LIB([z], [deflate], [zlib])
     ])
-    COMPRESSION_CFLAGS="$COMPRESSION_CFLAGS -DUSE_gzip"
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
 ])
 
-# --- LZ4 ---
+# Process Zlib-NG engine
+AS_IF([test "x$with_gzip_ng" = "xyes"], [
+    AS_IF([test "$ZLIB_NG" = "static"], [
+        AC_CHECK_STATIC_LIB([zlib-ng.h], [z-ng])
+    ], [
+        AC_CHECK_DYNAMIC_LIB([z-ng], [zng_deflate], [libz-ng])
+    ])
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
+])
+
+# --- Lz4 ---
 AS_IF([test "x$with_lz4" = "xyes"], [
     AS_IF([test "$LZ4" = "static"], [
         AC_CHECK_STATIC_LIB([lz4.h], [lz4])
     ], [
         AC_CHECK_DYNAMIC_LIB([lz4], [LZ4_compress_default], [liblz4])
     ])
-    COMPRESSION_CFLAGS="$COMPRESSION_CFLAGS -DUSE_lz4"
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_lz4"])
 ])
 
-# --- SNAPPY ---
+# --- Snappy ---
 AS_IF([test "x$with_snappy" = "xyes"], [
     AS_IF([test "$SNAPPY" = "static"], [
         AC_CHECK_STATIC_LIB([snappy.h], [snappy])
     ], [
         AC_CHECK_DYNAMIC_LIB([snappy], [snappy_compress], [libsnappy])
     ])
-    COMPRESSION_CFLAGS="$COMPRESSION_CFLAGS -DUSE_snappy"
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_snappy"])
 ])
 
-# --- ZSTANDARD ---
+# --- Zstandard ---
 AS_IF([test "x$with_zstd" = "xyes"], [
     AS_IF([test "$ZSTD" = "static"], [
         AC_CHECK_STATIC_LIB([zstd.h], [zstd])
     ], [
         AC_CHECK_DYNAMIC_LIB([zstd], [ZSTD_compress], [libzstd])
     ])
-    COMPRESSION_CFLAGS="$COMPRESSION_CFLAGS -DUSE_zstd"
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_zstd"])
 ])
 
 

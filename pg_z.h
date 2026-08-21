@@ -85,10 +85,17 @@ Datum pg_unbrotli(PG_FUNCTION_ARGS);
  * ===============================================================
  */
 
+// Standard zlib
 Datum pg_gzip(PG_FUNCTION_ARGS);
 Datum pg_gunzip(PG_FUNCTION_ARGS);
 Datum pg_deflate(PG_FUNCTION_ARGS);
 Datum pg_inflate(PG_FUNCTION_ARGS);
+
+// Zlib-NG
+Datum pg_gzip_ng(PG_FUNCTION_ARGS);
+Datum pg_gunzip_ng(PG_FUNCTION_ARGS);
+Datum pg_deflate_ng(PG_FUNCTION_ARGS);
+Datum pg_inflate_ng(PG_FUNCTION_ARGS);
 
 /*
  * ===============================================================
