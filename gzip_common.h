@@ -46,13 +46,14 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 	int32 compression_level = PG_GETARG_INT32(1);
 	int32 window_bits = PG_GETARG_INT32(2);
 	const uint8 *in_data = (uint8 *)(VARDATA_ANY(in_varlena));
+
 	size_t in_size = VARSIZE_ANY_EXHDR(in_varlena);
 
 	int volatile zs_initialized = 0;
 	MY_Z_STREAM zs;
 	uint8 *volatile out_buf = NULL, *tmp_buf = NULL;
 	struct varlena *out_varlena = NULL;
-	size_t allocated_size = 0, current_used = 0;
+	size_t allocated_size = 0, current_used = 0, grow_factor = 0;
 	int ret = Z_OK;
 	int mem_level = 8; // 8 is balance between minimum and maximum memory
 					   // consumption during compression
@@ -96,9 +97,6 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 
 		// rough estimate for gzip format
 		allocated_size = in_size + (in_size / 1000) + 32 + VARHDRSZ;
-		// anti-fragmentation round up to next multiple of memory chunk size
-		allocated_size = (allocated_size + (memory_chunk_size - 1)) &
-						 ~(memory_chunk_size - 1);
 
 		out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 		if (out_buf == NULL)
@@ -118,14 +116,15 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 			 * and no more space left in the out_buf (zs.avail_out == 0)
 			 */
 			if (ret == Z_OK && zs.avail_out == 0) {
-				allocated_size += memory_chunk_size;
+				grow_factor = (allocated_size > 0) ? allocated_size
+												   : memory_chunk_size;
+				allocated_size += grow_factor;
 				tmp_buf =
 						(uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 				if (tmp_buf == NULL)
 					elog(ERROR,
 						 "out of memory during compression buffer "
-						 "reallocation to "
-						 "%zu bytes",
+						 "reallocation to %zu bytes",
 						 allocated_size);
 
 				out_buf = tmp_buf;
@@ -174,7 +173,7 @@ MY_DECOMPRESS(PG_FUNCTION_ARGS)
 	int volatile zs_initialized = 0;
 	MY_Z_STREAM zs;
 	uint8 *volatile out_buf = NULL, *tmp_buf = NULL;
-	size_t allocated_size = 0, current_used = 0, grow_facctor = 0;
+	size_t allocated_size = 0, current_used = 0, grow_factor = 0;
 	struct varlena *out_varlena = NULL;
 	int ret = Z_OK;
 
@@ -220,9 +219,9 @@ MY_DECOMPRESS(PG_FUNCTION_ARGS)
 					 max_uncompressed_size);
 
 			if ((ret == Z_OK || ret == Z_BUF_ERROR) && zs.avail_out == 0) {
-				grow_facctor = (allocated_size > 0) ? allocated_size
-													: memory_chunk_size;
-				allocated_size += grow_facctor;
+				grow_factor = (allocated_size > 0) ? allocated_size
+												   : memory_chunk_size;
+				allocated_size += grow_factor;
 				tmp_buf =
 						(uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 				if (tmp_buf == NULL)
