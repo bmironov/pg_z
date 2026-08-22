@@ -11,13 +11,10 @@
 #ifndef PG_Z_H
 #define PG_Z_H
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-
 #ifndef GIT_VERSION
-#define PG_Z_VERSION "Unknown"
+#define PG_Z_VERSION "0.0.1"
 #else
-#define PG_Z_VERSION TOSTRING(GIT_VERSION)
+#define PG_Z_VERSION GIT_VERSION
 #endif
 
 #ifdef _WIN32

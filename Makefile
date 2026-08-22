@@ -1,8 +1,15 @@
 EXTENSION = pg_z
 
-# Get the latest git tag, or fallback to hash if no tags exist
-GIT_VERSION := $(shell git describe --tags --always)
-PG_CFLAGS += -DGIT_VERSION=$(GIT_VERSION)
+ifneq ($(wildcard $(srcdir)/.git),)
+    override GIT_VERSION := $(shell cd $(srcdir) && git describe --tags --abbrev=0)
+else ifneq ($(wildcard $(srcdir)/VERSION),)
+    override GIT_VERSION := $(shell cat $(srcdir)/VERSION 2>/dev/null | tr -d '\n')
+else
+    GIT_VERSION := 0.0.1
+endif
+override GIT_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),0.0.1)
+
+PG_CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
 DATA = pg_z--1.0.sql
 MODULE_big = pg_z

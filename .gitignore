@@ -14,3 +14,6 @@ tmp/*
 /configure~
 /Makefile.port
 /pg_z--*.sql
+
+# GitHub Actions
+VERSION

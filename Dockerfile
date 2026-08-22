@@ -47,14 +47,14 @@ ENV LD_LIBRARY_PATH=$LIBRARY_PATH
 WORKDIR /build/pg_z
 RUN chown -R postgres:postgres /build/pg_z
 COPY --chown=postgres:postgres . .
+RUN echo "Content of VERSION:" && cat VERSION 
 USER postgres
-
-RUN git config --global --add safe.directory /build/pg_z
 
 # Default configuration builds an "all-in" version
 # Users can override this step locally to pass specific configure flags
 # See documentation for details
 RUN autoreconf -if && ./configure && make clean && make
+
 
 USER root
 RUN make install
