@@ -1,9 +1,3 @@
-*.o
-*.so
-*.bc
-
-tmp/*
-
 # Autotools generated files
 /autom4te.cache/
 /config.guess

@@ -1,0 +1,8 @@
+*.o
+*.so
+*.bc
+
+Makefile
+pg_z--*.sql
+
+results/*
