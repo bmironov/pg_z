@@ -29,7 +29,6 @@ static registry_index tracked_pages_capacity = 0;
 // allocated memory size for tracker
 static size_t allocated_size = 0;
 
-static MemoryContextCallback registry_cleanup_callback;
 static MemoryContext last_registered_context = NULL;
 /*
  * ===========================================================
@@ -132,7 +131,12 @@ pg_mem_tracker_cleanup(void *arg)
 			if (address != NULL && region_size > 0) {
 				actual_size = (size_t)abs(region_size);
 				// just being paranoid after playing with sign bits in size
-				munmap(address, actual_size);
+				if (munmap(address, actual_size) != 0) {
+					elog(WARNING,
+						 "munmap failed at %p (size %zu): %m",
+						 address,
+						 actual_size);
+				}
 			}
 			i++;
 		}
@@ -151,6 +155,8 @@ pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 	registry_index new_capacity = 0;
 	size_t new_size = 0;
 	MemTracker *tmp_registry = NULL;
+	MemoryContext old_context;
+	MemoryContextCallback *registry_cleanup_callback;
 
 	if (address == NULL)
 		return;
@@ -159,10 +165,13 @@ pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 
 	/* Attach the tuple reset handler hook to CurrentMemoryContext */
 	if (last_registered_context != CurrentMemoryContext) {
-		registry_cleanup_callback.func = pg_mem_tracker_cleanup;
-		registry_cleanup_callback.arg = NULL;
+		registry_cleanup_callback =
+				(MemoryContextCallback *)palloc(sizeof(MemoryContextCallback));
+
+		registry_cleanup_callback->func = pg_mem_tracker_cleanup;
+		registry_cleanup_callback->arg = NULL;
 		MemoryContextRegisterResetCallback(
-				CurrentMemoryContext, &registry_cleanup_callback);
+				CurrentMemoryContext, registry_cleanup_callback);
 		last_registered_context = CurrentMemoryContext;
 	}
 
@@ -184,7 +193,9 @@ pg_mem_tracker_register(void *address, size_t size, bool is_huge)
 			return;
 		}
 
+		old_context = MemoryContextSwitchTo(TopMemoryContext);
 		tmp_registry = (MemTracker *)repalloc(page_registry, new_size);
+		MemoryContextSwitchTo(old_context);
 		if (tmp_registry == NULL) {
 			elog(ERROR,
 				 "Memory tracker overflow during active row "
