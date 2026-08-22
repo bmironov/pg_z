@@ -1,69 +1,50 @@
-EXTENSION = pg_z
-
-ifneq ($(wildcard $(srcdir)/.git),)
-    override GIT_VERSION := $(shell cd $(srcdir) && git describe --tags --abbrev=0)
-else ifneq ($(wildcard $(srcdir)/VERSION),)
-    override GIT_VERSION := $(shell cat $(srcdir)/VERSION 2>/dev/null | tr -d '\n')
-else
-    GIT_VERSION := 0.0.1
+ifneq ($(wildcard .git),)
+    GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null)
+else ifneq ($(wildcard VERSION),)
+    GIT_VERSION := $(shell cat VERSION 2>/dev/null | tr -d '\n')
 endif
-override GIT_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),0.0.1)
 
-PG_CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+GIT_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),0.0.1)
+export GIT_VERSION
 
-DATA = pg_z--1.0.sql
-MODULE_big = pg_z
 
-BUILD_DIR = tmp
-SRC_MODULES = pg_z mem_manager
-ALGO_MODULES = brotli gzip gzip_ng lz4 snappy zstd
+-include Makefile.port
 
--include $(top_srcdir)/Makefile.port Makefile.port ../Makefile.port
-
-REGRESS := core db_params
 ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(COMPRESSION_CFLAGS))
-REGRESS += $(ACTIVE_ALGOS)
 
-# Now we can add "deflate" if gzip is present for all tests to run
 empty :=
 space := $(empty) $(empty)
-REGRESS := $(subst gzip$(space),gzip deflate$(space),$(REGRESS))
-REGRESS := $(subst gzip_ng$(space),gzip_ng deflate_ng$(space),$(REGRESS))
-BENCHMARK_ALGOS := $(subst gzip_ng$(space),gzip_ng deflate_ng$(space),$(ACTIVE_ALGOS))
-BENCHMARK_ALGOS := $(subst gzip$(space),gzip deflate$(space),$(BENCHMARK_ALGOS))
+BENCHMARK_ALGOS := $(subst gzip$(space),gzip deflate$(space),$(ACTIVE_ALGOS))
+BENCHMARK_ALGOS := $(subst gzip_ng$(space),gzip_ng deflate_ng$(space),$(BENCHMARK_ALGOS))
 
-export ACTIVE_ALGOS
-export BENCHMARK_ALGOS
-export CONFIGURE_RUN
-export DATA
-
-# Extract possible list of algos for load test
 ifeq (load_test,$(firstword $(MAKECMDGOALS)))
   LOADTEST_ALGOS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   $(eval $(LOADTEST_ALGOS):;@:)
 endif
 LOADTEST_ALGOS ?= $(BENCHMARK_ALGOS)
 
-# ========================================================================
-# First part: start from root with redirect to $(BUILD_DIR)
-# ========================================================================
-ifeq ($(filter $(BUILD_DIR),$(notdir $(CURDIR))),)
+export ACTIVE_ALGOS
+export CONFIGURE_RUN
+export LOADTEST_ALGOS
+export BENCHMARK_ALGOS
 
-.PHONY: all debug install installcheck benchmark load_test clean
+
+SUBDIRS = tmp
+
+
+.PHONY: all benchmark load_test debug install installcheck clean distclean
 
 all:
-	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=..
-	@cp $(BUILD_DIR)/$(DATA) . 2>/dev/null || true
+	$(MAKE) -C $(SUBDIRS) -f Makefile
 
 debug:
-	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. DEBUG_BUILD=1
-	@cp $(BUILD_DIR)/$(DATA) . 2>/dev/null || true
+	$(MAKE) -C $(SUBDIRS) -f Makefile DEBUG_BUILD=1
 
 install:
-	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. install
+	$(MAKE) -C $(SUBDIRS) -f Makefile install
 
-installcheck: all
-	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. installcheck
+installcheck:
+	$(MAKE) -C $(SUBDIRS) -f Makefile installcheck
 
 benchmark: all
 	@build/benchmark.sh
@@ -72,61 +53,10 @@ load_test: all
 	@build/load_test.sh "$(LOADTEST_ALGOS)"
 
 clean:
-	$(MAKE) -C $(BUILD_DIR) -f ../Makefile VPATH=.. clean
-	rm -f $(DATA) $(BUILD_DIR)/*.o $(BUILD_DIR)/*.bc $(BUILD_DIR)/*.so
+	-$(MAKE) -C $(SUBDIRS) -f Makefile clean 2>/dev/null || true
+	rm -f pg_z--*.sql
 
-# ========================================================================
-# Second part: build inside $(BUILD_DIR) using PGXS
-# ========================================================================
-else
-
-# Enforce that configure must be run beforehand
-ifndef CONFIGURE_RUN
-$(error Please run ./configure before running make)
-endif
-
-OBJS = $(addsuffix .o, $(SRC_MODULES)) $(addsuffix .o, $(ACTIVE_ALGOS))
-
-$(info OBJS:            $(OBJS))
-$(info REGRESS:         $(REGRESS))
-$(info ACTIVE_ALGOS:    $(ACTIVE_ALGOS))
-$(info BENCHMARK_ALGOS: $(BENCHMARK_ALGOS))
-
-ifdef DEBUG_BUILD
-	PG_CFLAGS += -g3 -O0
-	STRIP_CMD = true
-else
-	# march=native - to use hardware acceleration where possible
-	# For example, Snappy uses HW-accelerated CRC32C
-	#
-	# lto - Link-Time Optimization
-	PG_CFLAGS += -march=native -flto
-	SHLIB_LINK += -flto
-	STRIP_CMD = strip --strip-unneeded $(shlib)
-endif
-
-PG_CFLAGS += $(COMPRESSION_CFLAGS)
-$(info STATIC_LIBS:  $(STATIC_LIBS))
-$(info DYNAMIC_LIBS: $(DYNAMIC_LIBS))
-$(info PG_CFLAGS:    $(PG_CFLAGS))
-
-
-PG_LDFLAGS += -L/usr/lib/x86_64-linux-gnu
-SHLIB_LINK += -Wl,-Bstatic  -Wl,--start-group $(STATIC_LIBS) -Wl,--end-group \
-			  -Wl,-Bdynamic $(DYNAMIC_LIBS)
-
-PG_CONFIG = pg_config
-PGXS := $(shell $(PG_CONFIG) --pgxs)
-include $(PGXS)
-
-ifneq ($(filter install,$(MAKECMDGOALS)),install)
-all:
-ifndef DEBUG_BUILD
-	@echo "=== Stripping out .so if necessary ==="
-	@$(STRIP_CMD)
-endif
-	@echo "=== Generating SQL extension file ==="
-	@../build/generate_sql.sh ..
-endif
-
-endif
+distclean:
+	-$(MAKE) -C $(SUBDIRS) -f Makefile distclean 2>/dev/null || true
+	rm -rf Makefile.port config.log config.status autom4te.cache
+	rm -f $(SUBDIRS)/Makefile $(SUBDIRS)/Makefile.port

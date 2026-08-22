@@ -208,5 +208,5 @@ AC_MSG_NOTICE([DYNAMIC_LIBS:  $DYNAMIC_LIBS])
 AC_MSG_NOTICE([CFLAGS MACROS: $COMPRESSION_CFLAGS])
 AC_MSG_NOTICE([==================================================])
 
-AC_CONFIG_FILES([Makefile.port])
+AC_CONFIG_FILES([Makefile.port tmp/Makefile])
 AC_OUTPUT
