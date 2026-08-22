@@ -35,22 +35,24 @@ functions.
 
 ### Toggling Algorithms
 
-- `--without-brotli` : Exclude Brotli functions from the build.
-- `--without-gzip`   : Exclude Gzip and Deflate functions.
-- `--without-lz4`    : Exclude LZ4 functions.
-- `--without-snappy` : Exclude Snappy functions.
-- `--without-zstd`   : Exclude Zstandard functions.
+- `--without-brotli`  : Exclude Brotli functions from the build.
+- `--without-gzip`    : Exclude `zlib`-based Gzip and Deflate functions.
+- `--without-gzip-ng` : Exclude `zlib-ng`-based Gzip and Deflate functions.
+- `--without-lz4`     : Exclude LZ4 functions.
+- `--without-snappy`  : Exclude Snappy functions.
+- `--without-zstd`    : Exclude Zstandard functions.
 
 ### Controlling Linking Type
 
 You can force specific libraries to link either dynamically (`dynamic`) or
 statically (`static`) to suit your target deployment requirements:
 
-- `--with-link-brotli=static|dynamic` (Default: `static`)
-- `--with-link-gzip=static|dynamic`   (Default: `dynamic`)
-- `--with-link-lz4=static|dynamic`    (Default: `static`)
-- `--with-link-snappy=static|dynamic` (Default: `dynamic`, `dynamic` only on Debian)
-- `--with-link-zstd=static|dynamic`   (Default: `static`)
+- `--with-link-brotli=static|dynamic`  (Default: `static`)
+- `--with-link-gzip=static|dynamic`    (Default: `dynamic`)
+- `--with-link-gzip-ng=static|dynamic` (Default: `static`)
+- `--with-link-lz4=static|dynamic`     (Default: `static`)
+- `--with-link-snappy=static|dynamic`  (Default: `dynamic`, `dynamic` only on Debian)
+- `--with-link-zstd=static|dynamic`    (Default: `static`)
 
 ## Operating System Specific Constraints
 
@@ -75,26 +77,24 @@ For deployments that demand maximum throughput for `gzip` and `deflate`
 functions, consider using [zlib-ng][1] instead of stock `zlib`.
 
 `zlib-ng` utilizes modern CPU SIMD vectorization (AVX2, AVX-512, or NEON) and
-hardware-accelerated CRC32 instructions, unlocking next-generation performance
-(up to 2-3x faster decompression).
+hardware-accelerated CRC32 instructions, unlocking next-generation
+performance (up to 4x faster compression and significantly accelerated
+decompression).
 
-On Debian 13, you can install the hardware-accelerated `zlib-ng` optimization
-engine in transparent compatibility mode directly from the official repositories:
+If your distribution does not supply `zlib-ng`, you must build it from
+source. For implementation details, please review the `Dockerfile` in the
+root of this repository, which is used by GitHub Actions to validate code on
+every commit.
 
-```bash
-sudo apt-get install zlib1g-dev-zlib-ng
-```
+Note that `zlib-ng` can be compiled in `Compat` mode. A compatibility library
+can be placed into your system library path to transparently speed up all
+standard `zlib` calls. However, this introduces system-wide risk as it
+affects all binaries, including PostgreSQL itself.
 
-To enforce the high-performance `zlib-ng` engine, pass the following flag:
-
-```bash
-./configure --with-zlib-backend=zlib-ng
-```
-
-When using `zlib-ng` in its native `zlib-compat` mode, you can safely link it
-**statically** (via `--with-link-gzip=static`), completely embedding the
-hardware-accelerated engine into `pg_z.so` with zero external runtime
-dependencies.
+A safer approach is to compile `zlib-ng` in `Native` mode and use the native API
+wrappers provided in this extension. Alternatively, you can statically link
+`zlib-ng` directly into the extension's binary. This ensures that only `pg_z`
+uses the optimized `zlib-ng` logic without affecting the rest of the system.
 
 ## Custom Extreme Optimization (Zero Runtime Dependencies)
 
