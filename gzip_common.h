@@ -174,7 +174,7 @@ MY_DECOMPRESS(PG_FUNCTION_ARGS)
 	int volatile zs_initialized = 0;
 	MY_Z_STREAM zs;
 	uint8 *volatile out_buf = NULL, *tmp_buf = NULL;
-	size_t allocated_size = 0, current_used = 0;
+	size_t allocated_size = 0, current_used = 0, grow_facctor = 0;
 	struct varlena *out_varlena = NULL;
 	int ret = Z_OK;
 
@@ -220,7 +220,9 @@ MY_DECOMPRESS(PG_FUNCTION_ARGS)
 					 max_uncompressed_size);
 
 			if ((ret == Z_OK || ret == Z_BUF_ERROR) && zs.avail_out == 0) {
-				allocated_size += memory_chunk_size;
+				grow_facctor = (allocated_size > 0) ? allocated_size
+													: memory_chunk_size;
+				allocated_size += grow_facctor;
 				tmp_buf =
 						(uint8 *)pg_hybrid_repalloc(out_buf, &allocated_size);
 				if (tmp_buf == NULL)

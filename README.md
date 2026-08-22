@@ -353,29 +353,29 @@ Prepared following test data set:
 --------------+-----------------------+--------------+-----------
 Test #/Result | Algorithm / Function  | Result, bytes| Duration
 --------------+-----------------------+--------------+-----------
-  1 OK        | brotli compress       |      307,976 |    154 ms
-  2 OK        | brotli decompress     |  115,088,895 |  5,512 ms
+  1 OK        | brotli compress       |      307,976 |    152 ms
+  2 OK        | brotli decompress     |  115,088,895 |     85 ms
 --------------+-----------------------+--------------+-----------
-  3 OK        | gzip compress         |      957,968 |    364 ms
-  4 OK        | gzip decompress       |  115,088,895 |  5,647 ms
+  3 OK        | gzip compress         |      957,968 |    369 ms
+  4 OK        | gzip decompress       |  115,088,895 |    104 ms
 --------------+-----------------------+--------------+-----------
-  5 OK        | deflate compress      |      957,950 |    348 ms
-  6 OK        | deflate decompress    |  115,088,895 |  5,589 ms
+  5 OK        | deflate compress      |      957,950 |    358 ms
+  6 OK        | deflate decompress    |  115,088,895 |     89 ms
 --------------+-----------------------+--------------+-----------
-  7 OK        | gzip_ng compress      |      946,664 |    141 ms
-  8 OK        | gzip_ng decompress    |  115,088,895 |  5,543 ms
+  7 OK        | gzip_ng compress      |      946,663 |    146 ms
+  8 OK        | gzip_ng decompress    |  115,088,895 |     91 ms
 --------------+-----------------------+--------------+-----------
-  9 OK        | deflate_ng compress   |      946,646 |    139 ms
- 10 OK        | deflate_ng decompress |  115,088,895 |  5,570 ms
+  9 OK        | deflate_ng compress   |      946,645 |    141 ms
+ 10 OK        | deflate_ng decompress |  115,088,895 |     86 ms
 --------------+-----------------------+--------------+-----------
- 11 OK        | lz4 compress          |    1,401,239 |    208 ms
- 12 OK        | lz4 decompress        |  115,088,895 |     48 ms
+ 11 OK        | lz4 compress          |    1,401,239 |    210 ms
+ 12 OK        | lz4 decompress        |  115,088,895 |     51 ms
 --------------+-----------------------+--------------+-----------
- 13 OK        | snappy compress       |    6,712,726 |     71 ms
- 14 OK        | snappy decompress     |  115,088,895 |  5,401 ms
+ 13 OK        | snappy compress       |    6,712,726 |     70 ms
+ 14 OK        | snappy decompress     |  115,088,895 |    101 ms
 --------------+-----------------------+--------------+-----------
- 15 OK        | zstd compress         |      312,367 |    151 ms
- 16 OK        | zstd decompress       |  115,088,895 |     52 ms
+ 15 OK        | zstd compress         |      312,369 |    158 ms
+ 16 OK        | zstd decompress       |  115,088,895 |     50 ms
 --------------+-----------------------+--------------+-----------
 1..16
 # All 16 benchmarks passed.

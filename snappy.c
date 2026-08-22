@@ -188,8 +188,8 @@ pg_unsnappy(PG_FUNCTION_ARGS)
 	uint8 *volatile out_buf = NULL, *tmp_buf = NULL;
 
 	struct varlena *out_varlena = NULL;
-	size_t allocated_size = 0, out_offset = 0, new_allocated_size = 0;
-	size_t src_offset = 0, chunk_len = 0;
+	size_t allocated_size = 0, out_offset = 0, new_allocated_size = 0,
+		   src_offset = 0, chunk_len = 0;
 	uint8_t chunk_type = 0;
 	bool magic_verified = false;
 	snappy_status status;
@@ -201,9 +201,6 @@ pg_unsnappy(PG_FUNCTION_ARGS)
 	{
 		// rough estimate for text content
 		allocated_size = in_size * 4 + VARHDRSZ;
-		// rounding up to closest multiple of memory_chunk_size
-		allocated_size = (allocated_size + (memory_chunk_size - 1)) &
-						 ~(memory_chunk_size - 1);
 
 		out_buf = (uint8 *)pg_hybrid_alloc(&allocated_size);
 		if (out_buf == NULL)
@@ -254,8 +251,8 @@ pg_unsnappy(PG_FUNCTION_ARGS)
 			// Process valid payload frames
 			if (chunk_type == CHUNK_COMPRESSED_DATA ||
 				chunk_type == CHUNK_UNCOMPRESSED_DATA) {
-				size_t data_len = 0;
-				size_t uncompressed_chunk_len = 0;
+				size_t data_len = 0, uncompressed_chunk_len = 0,
+					   grow_factor = 0;
 
 				if (chunk_len < 4)
 					elog(ERROR,
@@ -281,7 +278,12 @@ pg_unsnappy(PG_FUNCTION_ARGS)
 				new_allocated_size =
 						VARHDRSZ + out_offset + uncompressed_chunk_len;
 				if (new_allocated_size > allocated_size) {
-					allocated_size = new_allocated_size;
+					grow_factor = (allocated_size > 0) ? allocated_size
+													   : memory_chunk_size;
+					allocated_size += grow_factor;
+					if (allocated_size < new_allocated_size)
+						allocated_size = new_allocated_size;
+
 					tmp_buf = (uint8 *)pg_hybrid_repalloc(
 							(void *)out_buf, &allocated_size);
 					if (tmp_buf == NULL)
