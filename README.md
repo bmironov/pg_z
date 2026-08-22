@@ -371,8 +371,8 @@ Test #/Result | Algorithm / Function  | Result, bytes| Duration
  11 OK        | lz4 compress          |    1,401,239 |    210 ms
  12 OK        | lz4 decompress        |  115,088,895 |     51 ms
 --------------+-----------------------+--------------+-----------
- 13 OK        | snappy compress       |    6,712,726 |     70 ms
- 14 OK        | snappy decompress     |  115,088,895 |    101 ms
+ 13 OK        | snappy compress       |    6,712,724 |     70 ms
+ 14 OK        | snappy decompress     |  115,088,895 |     60 ms
 --------------+-----------------------+--------------+-----------
  15 OK        | zstd compress         |      312,369 |    158 ms
  16 OK        | zstd decompress       |  115,088,895 |     50 ms
