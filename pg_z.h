@@ -10,7 +10,14 @@
 #ifndef PG_Z_H
 #define PG_Z_H
 
-#define PG_Z_VERSION "1.0"
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+#ifndef GIT_VERSION
+#define PG_Z_VERSION "Unknown"
+#else
+#define PG_Z_VERSION TOSTRING(GIT_VERSION)
+#endif
 
 #ifdef _WIN32
 /* Windows compatibility stubs for compilation */

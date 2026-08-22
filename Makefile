@@ -1,4 +1,9 @@
 EXTENSION = pg_z
+
+# Get the latest git tag, or fallback to hash if no tags exist
+GIT_VERSION := $(shell git describe --tags --always)
+PG_CFLAGS += -DGIT_VERSION=$(GIT_VERSION)
+
 DATA = pg_z--1.0.sql
 MODULE_big = pg_z
 
@@ -93,10 +98,11 @@ else
 	STRIP_CMD = strip --strip-unneeded $(shlib)
 endif
 
+PG_CFLAGS += $(COMPRESSION_CFLAGS)
 $(info STATIC_LIBS:  $(STATIC_LIBS))
 $(info DYNAMIC_LIBS: $(DYNAMIC_LIBS))
+$(info PG_CFLAGS:    $(PG_CFLAGS))
 
-PG_CFLAGS += $(COMPRESSION_CFLAGS)
 
 PG_LDFLAGS += -L/usr/lib/x86_64-linux-gnu
 SHLIB_LINK += -Wl,-Bstatic  -Wl,--start-group $(STATIC_LIBS) -Wl,--end-group \
