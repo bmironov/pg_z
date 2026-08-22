@@ -132,10 +132,12 @@ pg_mem_tracker_cleanup(void *arg)
 				actual_size = (size_t)abs(region_size);
 				// just being paranoid after playing with sign bits in size
 				if (munmap(address, actual_size) != 0) {
-					elog(WARNING,
-						 "munmap failed at %p (size %zu): %m",
-						 address,
-						 actual_size);
+					fprintf(stderr,
+							"WARNING: pg_z munmap failed at %p (size %zu): "
+							"%s\n",
+							address,
+							actual_size,
+							strerror(errno));
 				}
 			}
 			i++;
