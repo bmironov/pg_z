@@ -49,6 +49,8 @@ RUN chown -R postgres:postgres /build/pg_z
 COPY --chown=postgres:postgres . .
 USER postgres
 
+RUN git config --global --add safe.directory /build/pg_z
+
 # Default configuration builds an "all-in" version
 # Users can override this step locally to pass specific configure flags
 # See documentation for details

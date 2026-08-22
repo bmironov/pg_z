@@ -13,33 +13,33 @@ SELECT brotli('') AS brotli_blank;
 (1 row)
 
 SELECT brotli('\x00'::bytea) AS brotli_zero;
-  brotli_zero   
-----------------
- \x010000040003
+ brotli_zero  
+--------------
+ \x0500800003
 (1 row)
 
 SELECT brotli('The quick brown fox jumps over the lazy dog') AS brotli_default;
-                                        brotli_default                                        
-----------------------------------------------------------------------------------------------
- \x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801
+                                       brotli_default                                       
+--------------------------------------------------------------------------------------------
+ \x152a000040c5396563c584a10ea803fa43a400527842df4127a8c1b7c2f243dca54df0a181e50959fe1f0c3b
 (1 row)
 
 SELECT brotli('The quick brown fox jumps over the lazy dog'::bytea) AS brotli_default;
-                                        brotli_default                                        
-----------------------------------------------------------------------------------------------
- \x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801
+                                       brotli_default                                       
+--------------------------------------------------------------------------------------------
+ \x152a000040c5396563c584a10ea803fa43a400527842df4127a8c1b7c2f243dca54df0a181e50959fe1f0c3b
 (1 row)
 
 SELECT brotli('The quick brown fox jumps over the lazy dog'::text) AS brotli_default;
-                                        brotli_default                                        
-----------------------------------------------------------------------------------------------
- \x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801
+                                       brotli_default                                       
+--------------------------------------------------------------------------------------------
+ \x152a000040c5396563c584a10ea803fa43a400527842df4127a8c1b7c2f243dca54df0a181e50959fe1f0c3b
 (1 row)
 
 SELECT brotli('The quick brown fox jumps over the lazy dog'::bytea, 8) AS brotli_8;
                                             brotli_8                                            
 ------------------------------------------------------------------------------------------------
- \x8150010020e6364af56a58288a5391e764f2e728ba4055d94ab2c27ce18da723f2a2ac3626b8d50e8ca9ee3f0426
+ \x152a0000c4dc46a95e0d0b45712af29c4cfe1c4517a82a5b4956982fbcf174445e94d5c604b7da8131d5fd87c004
 (1 row)
 
 WITH str AS (
