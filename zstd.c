@@ -75,6 +75,10 @@ pg_zstd(PG_FUNCTION_ARGS)
 	ZstdCleanupArg *cleanup_arg = NULL;
 	MemoryContextCallback *cleanup_cb = NULL;
 
+	ZSTD_inBuffer input_stream;
+	ZSTD_outBuffer output_stream;
+	size_t init_status = 0, stream_status = 0;
+
 	if (in_size == 0)
 		PG_RETURN_BYTEA_P(in_varlena);
 
@@ -140,14 +144,37 @@ pg_zstd(PG_FUNCTION_ARGS)
 				cctx, ZSTD_c_compressionLevel, compression_level);
 		ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, threads);
 
-		// Perform multi-threaded compression
-		comp_size = ZSTD_compressCCtx(
-				cctx,
-				dst_buf,
-				max_dst_size - VARHDRSZ,
-				in_data,
-				in_size,
-				compression_level);
+		init_status = ZSTD_CCtx_setPledgedSrcSize(cctx, in_size);
+		if (ZSTD_isError(init_status))
+			elog(ERROR,
+				 "ZSTD stream initialization failed: %s",
+				 ZSTD_getErrorName(init_status));
+
+		input_stream.src = in_data;
+		input_stream.size = in_size;
+		input_stream.pos = 0;
+
+		output_stream.dst = dst_buf;
+		output_stream.size = max_dst_size - VARHDRSZ;
+		output_stream.pos = 0;
+
+		do {
+			CHECK_FOR_INTERRUPTS();
+
+			stream_status = ZSTD_compressStream2(
+					cctx,
+					&output_stream,
+					&input_stream,
+					ZSTD_e_end); /* Force end-of-frame job routing directly */
+
+			if (ZSTD_isError(stream_status))
+				elog(ERROR,
+					 "ZSTD parallel processing failed: %s",
+					 ZSTD_getErrorName(stream_status));
+
+		} while (stream_status > 0);
+
+		comp_size = output_stream.pos;
 
 		// Check for runtime errors
 		if (ZSTD_isError(comp_size))

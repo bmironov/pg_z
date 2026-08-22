@@ -50,15 +50,26 @@ get_hash_value() {
     echo "$ret"
 }
 
-get_default_level() {
+get_level() {
     HASH=$1
     KEY=$2
+    LEVEL=$3
 
     LEVELS=$(get_hash_value "$HASH" "$KEY")
     read MIN_LEVEL DEFAULT_LEVEL MAX_LEVEL <<EOF
 $LEVELS
 EOF
-    echo $DEFAULT_LEVEL
+    case $LEVEL in
+    "MIN")
+        echo $MIN_LEVEL
+        ;;
+    "DEFAULT")
+        echo $DEFAULT_LEVEL
+        ;;
+    "MAX")
+        echo $MAX_LEVEL
+        ;;
+    esac
 }
 
 show_separator() {
@@ -173,9 +184,13 @@ for ALGO in $ALGOS; do
         show_separator "$ALGO multi-threaded"
     fi
     for THREADS in $THREADS_LIST; do
-        DEFAULT_LEVEL=$(get_default_level "$COMPRESSION_LEVELS" "$ALGO")
+        MIN_LEVEL=$(get_level "$COMPRESSION_LEVELS" "$ALGO" "MIN")
+        DEFAULT_LEVEL=$(get_level "$COMPRESSION_LEVELS" "$ALGO" "DEFAULT")
+        MAX_LEVEL=$(get_level "$COMPRESSION_LEVELS" "$ALGO" "MAX")
         # echo "Running $ALGO-$DEFAULT_LEVEL test with $THREADS threads"
+        run_test $ALGO $MIN_LEVEL $THREADS
         run_test $ALGO $DEFAULT_LEVEL $THREADS
+        run_test $ALGO $MAX_LEVEL $THREADS
     done
 
 done
