@@ -6,6 +6,27 @@
 PG_FUNCTION_INFO_V1(pg_zstd);
 PG_FUNCTION_INFO_V1(pg_unzstd);
 
+// Struct to track and safely clean up multi-threaded Zstd contexts on
+// abort/error
+typedef struct ZstdCleanupArg {
+	ZSTD_CCtx *cctx;
+} ZstdCleanupArg;
+
+/*
+ * Fail-safe callback executed by PostgreSQL if the memory context is reset or
+ * destroyed.
+ */
+static void
+zstd_context_cleanup_callback(void *arg)
+{
+	ZstdCleanupArg *cleanup = (ZstdCleanupArg *)arg;
+
+	if (cleanup->cctx != NULL) {
+		ZSTD_freeCCtx(cleanup->cctx);
+		cleanup->cctx = NULL;
+	}
+}
+
 /*
  * Custom allocation wrapper for Zstd. Helps to force usage of palloc
  * Opaque parameter passes the active PostgreSQL MemoryContext.
@@ -51,10 +72,8 @@ pg_zstd(PG_FUNCTION_ARGS)
 	size_t comp_size = 0, max_dst_size = 0;
 	char *dst_buf = NULL;
 
-	ZSTD_customMem zstd_allocator = {
-			.customAlloc = pg_zstd_alloc,
-			.customFree = pg_zstd_free,
-			.opaque = (void *)CurrentMemoryContext};
+	ZstdCleanupArg *cleanup_arg = NULL;
+	MemoryContextCallback *cleanup_cb = NULL;
 
 	if (in_size == 0)
 		PG_RETURN_BYTEA_P(in_varlena);
@@ -74,8 +93,35 @@ pg_zstd(PG_FUNCTION_ARGS)
 		// Determine safe upper bound for output buffer size
 		max_dst_size = ZSTD_compressBound(in_size);
 
-		// Create a Zstd Context
-		cctx = ZSTD_createCCtx_advanced(zstd_allocator);
+		if (threads > 1) {
+			cctx = ZSTD_createCCtx();
+
+			if (cctx != NULL) {
+				/*
+				 * Register a fail-safe reset callback.
+				 * If PostgreSQL aborts the query due to a timeout, rollback,
+				 * or error, this memory context hook will execute and safely
+				 * call ZSTD_freeCCtx() to prevent any malloc memory leaks.
+				 */
+
+				cleanup_arg = (ZstdCleanupArg *)palloc(sizeof(ZstdCleanupArg));
+				cleanup_cb = (MemoryContextCallback *)palloc(
+						sizeof(MemoryContextCallback));
+
+				cleanup_arg->cctx = cctx;
+				cleanup_cb->func = zstd_context_cleanup_callback;
+				cleanup_cb->arg = (void *)cleanup_arg;
+
+				MemoryContextRegisterResetCallback(
+						CurrentMemoryContext, cleanup_cb);
+			}
+		} else {
+			ZSTD_customMem zstd_allocator = {
+					.customAlloc = pg_zstd_alloc,
+					.customFree = pg_zstd_free,
+					.opaque = (void *)CurrentMemoryContext};
+			cctx = ZSTD_createCCtx_advanced(zstd_allocator);
+		}
 		if (cctx == NULL)
 			elog(ERROR, "failed to create compression context");
 
@@ -110,8 +156,11 @@ pg_zstd(PG_FUNCTION_ARGS)
 	PG_CATCH();
 	{
 		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
-		if (cctx != NULL)
+		if (cctx != NULL) {
 			ZSTD_freeCCtx(cctx);
+			if (cleanup_arg != NULL)
+				cleanup_arg->cctx = NULL;
+		}
 		if (out_buf != NULL)
 			pg_hybrid_free((void *)out_buf);
 
@@ -121,6 +170,8 @@ pg_zstd(PG_FUNCTION_ARGS)
 
 	PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
 	ZSTD_freeCCtx(cctx);
+	if (cleanup_arg != NULL)
+		cleanup_arg->cctx = NULL;
 
 	out_varlena = (struct varlena *)out_buf;
 	SET_VARSIZE(out_varlena, comp_size + VARHDRSZ);
