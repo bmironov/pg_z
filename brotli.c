@@ -7,6 +7,9 @@
 PG_FUNCTION_INFO_V1(pg_brotli);
 PG_FUNCTION_INFO_V1(pg_unbrotli);
 
+/* Stream chunk buffer size used to check for PostgreSQL backend signals */
+#define WORK_CHUNK_SIZE (1024 * 1024)
+
 /*
  * Custom allocation wrapper for brotli. Helps to force usage of palloc
  * Opaque parameter passes the active PostgreSQL MemoryContext.
@@ -51,11 +54,12 @@ pg_brotli(PG_FUNCTION_ARGS)
 	size_t available_in = 0, available_out = 0;
 	const uint8 *next_in = NULL;
 
+	uint32_t lgwin = 19; /* Default to 512KB for balance */
+	size_t bytes_to_feed = 0;
+	BrotliEncoderOperation op = BROTLI_OPERATION_PROCESS;
+
 	if (in_size == 0) {
-		out_varlena = (struct varlena *)palloc(VARHDRSZ);
-		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
-		SET_VARSIZE(out_varlena, VARHDRSZ);
-		PG_RETURN_BYTEA_P(out_varlena);
+		PG_RETURN_BYTEA_P(in_varlena);
 	}
 
 	PG_TRY();
@@ -72,6 +76,19 @@ pg_brotli(PG_FUNCTION_ARGS)
 				 "Brotli compression level must be between %d and %d",
 				 BROTLI_MIN_QUALITY,
 				 BROTLI_MAX_QUALITY);
+
+		if (compression_level >= 10) {
+			if (in_size >= 16 * 1024 * 1024)
+				lgwin = 24; /* Max 16MB window */
+			else if (in_size >= 8 * 1024 * 1024)
+				lgwin = 23; /* 8MB window */
+			else if (in_size >= 4 * 1024 * 1024)
+				lgwin = 22; /* 4MB window */
+			else if (in_size >= 2 * 1024 * 1024)
+				lgwin = 21; /* 2MB window */
+			else
+				lgwin = 20; /* 1MB window */
+		}
 
 		// Pre-calculate the maximum bound for the compressed buffer size.
 		allocated_size = BrotliEncoderMaxCompressedSize(in_size) + VARHDRSZ;
@@ -99,7 +116,7 @@ pg_brotli(PG_FUNCTION_ARGS)
 		BrotliEncoderSetParameter(
 				state, BROTLI_PARAM_SIZE_HINT, (uint32_t)in_size);
 		// Set sliding window size to 2^17 = 128kB
-		BrotliEncoderSetParameter(state, BROTLI_PARAM_LGWIN, 17);
+		BrotliEncoderSetParameter(state, BROTLI_PARAM_LGWIN, lgwin);
 
 		available_in = in_size;
 		next_in = in_data;
@@ -107,17 +124,36 @@ pg_brotli(PG_FUNCTION_ARGS)
 		available_out = initial_data_capacity;
 		next_out = out_buf;
 
-		status = BrotliEncoderCompressStream(
-				state,
-				BROTLI_OPERATION_FINISH,
-				&available_in,
-				&next_in,
-				&available_out,
-				&next_out,
-				NULL);
+		while (in_size > 0 || op == BROTLI_OPERATION_FINISH) {
+			CHECK_FOR_INTERRUPTS();
 
-		if (status != BROTLI_TRUE)
-			elog(ERROR, "Brotli compression failed during stream processing");
+			if (in_size > 0) {
+				bytes_to_feed = (in_size > WORK_CHUNK_SIZE) ? WORK_CHUNK_SIZE
+															: in_size;
+				available_in = bytes_to_feed;
+				in_size -= bytes_to_feed;
+				op = (in_size == 0) ? BROTLI_OPERATION_FINISH
+									: BROTLI_OPERATION_PROCESS;
+			}
+
+			status = BrotliEncoderCompressStream(
+					state,
+					op,
+					&available_in,
+					&next_in,
+					&available_out,
+					&next_out,
+					NULL);
+
+			if (status != BROTLI_TRUE)
+				elog(ERROR,
+					 "Brotli compression failed during stream processing");
+
+			if (op == BROTLI_OPERATION_FINISH &&
+				BrotliEncoderIsFinished(state)) {
+				break;
+			}
+		}
 	}
 
 	PG_CATCH();
