@@ -1,6 +1,6 @@
 EXTENSION = pg_z
 MODULE_big = pg_z
-DATA = pg_z--1.0.sql
+DATA = pg_z--$(GIT_VERSION).sql
 CONTROL = pg_z.control
 VPATH = ..
 

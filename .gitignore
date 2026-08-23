@@ -1,13 +1,15 @@
 # Autotools generated files
-/autom4te.cache/
-/config.guess
-/config.log
-/config.status
-/config.sub
-/configure
-/configure~
-/Makefile.port
-/pg_z--*.sql
+autom4te.cache/
+config.guess
+config.log
+config.status
+config.sub
+configure
+configure~
+Makefile.port
+
+pg_z.control
+pg_z--*.sql
 
 # GitHub Actions
 VERSION

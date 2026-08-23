@@ -94,6 +94,7 @@ SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
 STATIC_LIBS=""
 DYNAMIC_LIBS=""
 COMPRESSION_CFLAGS=""
+ALGOS=""
 
 # ===========================================================================
 # REUSABLE MACROS FOR LIBRARY DETECTION
@@ -144,6 +145,7 @@ AS_IF([test "x$with_brotli" = "xyes"], [
     MY_CHECK_LIB([brotli_d], [libbrotli], [brotlidec],    [BrotliDecoderCreateInstance])
     AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
+        AS_VAR_APPEND([ALGOS], [" Brotli"])
     ])
 ])
 
@@ -154,6 +156,7 @@ AS_IF([test "x$with_gzip" = "xyes"], [
     MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
     AS_IF([test "x$HAVE_zlib" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
+        AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
     ])
 ])
 
@@ -163,6 +166,7 @@ AS_IF([test "x$with_gzip_ng" = "xyes"], [
     MY_CHECK_LIB([zlib_ng], [libz-ng], [z-ng], [zng_deflate])
     AS_IF([test "x$HAVE_zlib_ng" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
+        AS_VAR_APPEND([ALGOS], [" Gzip-NG/Deflate-NG"])
     ])
 ])
 
@@ -172,6 +176,7 @@ AS_IF([test "x$with_lz4" = "xyes"], [
     MY_CHECK_LIB([lz4], [liblz4], [lz4], [LZ4_compress_default])
     AS_IF([test "x$HAVE_lz4" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_lz4"])
+        AS_VAR_APPEND([ALGOS], [" LZ4"])
     ])
 ])
 
@@ -181,6 +186,7 @@ AS_IF([test "x$with_snappy" = "xyes"], [
     MY_CHECK_LIB([snappy], [libsnappy], [snappy], [snappy_compress])
     AS_IF([test "x$HAVE_snappy" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_snappy"])
+        AS_VAR_APPEND([ALGOS], [" Snappy"])
     ])
 ])
 
@@ -190,23 +196,37 @@ AS_IF([test "x$with_zstd" = "xyes"], [
     MY_CHECK_LIB([zstd], [libzstd], [zstd], [ZSTD_compress])
     AS_IF([test "x$HAVE_zstd" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_zstd"])
+        AS_VAR_APPEND([ALGOS], [" Zstd"])
     ])
 ])
 
 
 CONFIGURE_RUN="yes"
+ALGO_LIST=$(echo "$ALGOS" | xargs | sed "s/ /, /g")
+
+if test -f VERSION; then
+    GIT_VERSION=$(cat VERSION | tr -d '\n')
+elif test -d .git; then
+    GIT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null)
+else
+    GIT_VERSION="0.0.1"
+fi
 
 # Export results
 AC_SUBST(DYNAMIC_LIBS)
 AC_SUBST(STATIC_LIBS)
 AC_SUBST(COMPRESSION_CFLAGS)
 AC_SUBST(CONFIGURE_RUN)
+AC_SUBST([GIT_VERSION])
+AC_SUBST([ALGO_LIST])
 
 AC_MSG_NOTICE([==================================================])
+AC_MSG_NOTICE([GIT_VERSION:   $GIT_VERSION])
+AC_MSG_NOTICE([ALGO_LIST:     $ALGO_LIST])
 AC_MSG_NOTICE([STATIC_LIBS:   $STATIC_LIBS])
 AC_MSG_NOTICE([DYNAMIC_LIBS:  $DYNAMIC_LIBS])
 AC_MSG_NOTICE([CFLAGS MACROS: $COMPRESSION_CFLAGS])
 AC_MSG_NOTICE([==================================================])
 
-AC_CONFIG_FILES([Makefile.port tmp/Makefile])
+AC_CONFIG_FILES([Makefile.port tmp/Makefile pg_z.control])
 AC_OUTPUT

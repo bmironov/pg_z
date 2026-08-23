@@ -7,6 +7,9 @@ endif
 GIT_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),0.0.1)
 export GIT_VERSION
 
+DATA = pg_z--$(GIT_VERSION).sql
+export DATA
+
 
 -include Makefile.port
 

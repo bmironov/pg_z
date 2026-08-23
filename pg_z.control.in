@@ -1,0 +1,5 @@
+comment = 'Library of Compression/Decompression functions with support for: @ALGO_LIST@'
+default_version = '@GIT_VERSION@'
+relocatable = true
+module_pathname = 'pg_z'
+
