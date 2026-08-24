@@ -88,6 +88,7 @@ SHOW pg_z.mem_chunk_size;
 (1 row)
 
 SET pg_z.mem_chunk_size = 10000;
+NOTICE:  pg_z.mem_chunk_size has been rounded up to 16384
 SHOW pg_z.mem_chunk_size;
  pg_z.mem_chunk_size 
 ---------------------

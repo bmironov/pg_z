@@ -14,15 +14,32 @@ cleanup() {
 }
 trap cleanup EXIT
 
+show_separator() {
+    TITLE=$1
+    SEPARATOR="--------------+-----------------------+--------------+-----------"
+
+    if [ "a$TITLE" != "a" ]; then
+        REMAINDER=$((4 + ${#TITLE}))
+        STRING="${SEPARATOR:0:4}${TITLE}${SEPARATOR:$REMAINDER}"
+        SEPARATOR="$STRING"
+    fi
+
+    echo $SEPARATOR
+}
+
+show_header() {
+    show_separator
+    echo "Test #/Result | Algorithm / Function  | Result, bytes| Duration"
+}
+
 # Prepare test environment
 [ ! -d $RESULTS ] && mkdir $RESULTS
 rm -f ${RESULTS}/*
 psql -q -v ON_ERROR_STOP=1 -f ${SCRIPTS}/prepare.sql
 
-echo "--------------+-----------------------+--------------+-----------"
-echo "Test #/Result | Algorithm / Function  | Result, bytes| Duration"
+show_header
 for ALGO in $BENCHMARK_ALGOS; do
-    echo "--------------+-----------------------+--------------+-----------"
+    show_separator
     for PHASE in save compress decompress; do
         TEST=${ALGO}_${PHASE}
         FUNC="${ALGO}"
@@ -55,7 +72,7 @@ for ALGO in $BENCHMARK_ALGOS; do
             END_TIME=$(date +%s%3N)
             DURATION=$((END_TIME - START_TIME))
 
-            BYTES=$(sed -n '3p' $OUT)
+            BYTES=$(grep -A 1 -e "-------" $OUT | tail -n 1)
             if [ $STATUS -eq 0 ]; then
                 printf "%3d OK        | %-21s | %'12d | %'6d ms\n" ${COUNT} "${ALGO} ${PHASE}" ${BYTES} ${DURATION}
             else
@@ -67,7 +84,7 @@ for ALGO in $BENCHMARK_ALGOS; do
         fi
     done
 done
-echo "--------------+-----------------------+--------------+-----------"
+show_separator
 
 TOTAL=$((COUNT - 1))
 echo "1..${TOTAL}"

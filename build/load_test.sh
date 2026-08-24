@@ -124,7 +124,7 @@ run_test() {
         END_TIME=$(date +%s%3N)
         DURATION=$((END_TIME - START_TIME))
 
-        BYTES=$(sed -n '3p' $OUT)
+        BYTES=$(grep -A 1 -e "-------" $OUT | tail -n 1)
         if [ $STATUS -eq 0 ]; then
             printf "%3d OK        | %-20s | %'12d | %'6d ms\n" $COUNT "$TEST" $BYTES $DURATION
         else
