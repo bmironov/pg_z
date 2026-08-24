@@ -80,11 +80,11 @@ SELECT unbrotli(''::bytea) AS unbrotli_blank;
 (1 row)
 
 SELECT unbrotli('\x00'::bytea) AS unbrotli_8;
-ERROR:  decompression error 2: corrupted stream or invalid data
+ERROR:  Brotli decompression error 2: corrupted stream or invalid data
 SELECT unbrotli('\x0000'::bytea) AS unbrotli_16;
-ERROR:  decompression error 2: corrupted stream or invalid data
+ERROR:  Brotli decompression error 2: corrupted stream or invalid data
 SELECT unbrotli('fubar'::bytea) AS unbrotli_16;
-ERROR:  decompression error 0: corrupted stream or invalid data
+ERROR:  Brotli decompression error 0: corrupted stream or invalid data
 SELECT unbrotli(brotli('\x00000000000000000000'::bytea)) AS brotli_roundtrip_zero;
  brotli_roundtrip_zero  
 ------------------------
@@ -106,6 +106,6 @@ SET pg_z.max_size = 10;
 SELECT brotli('The quick brown fox jumps over the lazy dog') AS brotli_overlimit;
 ERROR:  input data is limited by pg_z.max_size (10 bytes)
 SELECT convert_from(unbrotli('\x81500100002ace291b2b260c75401dd01f220590c213fa0e3a410dbe15961fe22e6d820f0d2c4fc8f2ff60d801'::bytea), 'UTF8') AS unbrotli_overlimit;
-ERROR:  decompressed output exceeds pg_z.max_size (10 bytes)
+ERROR:  Brotli decompressed output data grew beyond pg_z.max_size limit (10 bytes)
 RESET pg_z.max_size;
 DROP EXTENSION pg_z;
