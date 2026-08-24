@@ -4,6 +4,7 @@
 #include <funcapi.h>
 #include <miscadmin.h>
 #include <utils/builtins.h>
+#include <utils/elog.h>
 #include <utils/guc.h>
 #include <utils/memutils.h>
 #include <varatt.h>
@@ -42,7 +43,7 @@ munmap(void *addr, size_t length)
 // GUC: memory allocation chunk size
 extern size_t memory_chunk_size;
 
-// GUC: maximum size of decompressed data in bytes; -1 = unlimited
+// GUC: maximum size of decompressed data in bytes
 extern size_t max_uncompressed_size;
 
 /*
@@ -67,7 +68,7 @@ void pg_mem_tracker_init_hugepage_size(void);
  * ===============================================================
  */
 
-#define MEM_8KB 8192
+#define MIN_MEM_SIZE_8KB 8192
 
 /* Global variable to store the actual default Huge Page size of the OS */
 extern size_t huge_page_size;

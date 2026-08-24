@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "pg_z.h"
+#include "utils/elog.h"
 #include "utils/memutils.h"
 
 PG_MODULE_MAGIC;
@@ -8,12 +9,14 @@ PG_MODULE_MAGIC;
 PG_FUNCTION_INFO_V1(pg_z_version);
 
 // GUC: memory allocation chunk size in bytes
-size_t memory_chunk_size;
 static int guc_memory_chunk_size;
+// shadow of GUC parameter of size_t type
+size_t memory_chunk_size;
 
-// GUC: maximum decompressed output size in bytes; -1 = unlimited
-size_t max_uncompressed_size;
+// GUC: maximum decompressed output size in bytes
 static int guc_max_uncompressed_size;
+// shadow of GUC parameter of size_t type
+size_t max_uncompressed_size;
 
 static void
 assign_memory_chunk_size(int newval, void *extra)
@@ -25,12 +28,19 @@ assign_memory_chunk_size(int newval, void *extra)
 static bool
 check_memory_chunk_size(int *newval, void **extra, GucSource source)
 {
-	if (*newval < MEM_8KB) {
-		*newval = MEM_8KB;
+	int orig_value = *newval;
+
+	if (*newval < MIN_MEM_SIZE_8KB) {
+		*newval = MIN_MEM_SIZE_8KB;
 	} else {
 		// rounding up size to closest 8kB multiple
-		*newval = (*newval + (MEM_8KB - 1)) & ~(MEM_8KB - 1);
+		*newval = (*newval + (MIN_MEM_SIZE_8KB - 1)) & ~(MIN_MEM_SIZE_8KB - 1);
 	}
+
+	if (orig_value != *newval)
+		ereport(NOTICE,
+				errmsg("pg_z.mem_chunk_size has been rounded up to %d",
+					   *newval));
 
 	return true;
 }
@@ -45,8 +55,18 @@ assign_max_uncompressed_size(int newval, void *extra)
 static bool
 check_max_uncompressed_size(int *newval, void **extra, GucSource source)
 {
+	int orig_value = *newval;
+
+	// Mostly dead code, but being extra cautious here in case of
+	// accidental change of parameter definition in _PG_init
 	if (*newval < 0)
-		guc_max_uncompressed_size = 0;
+		*newval = 0;
+	if (*newval > MaxAllocSize)
+		*newval = MaxAllocSize;
+
+	if (orig_value != *newval)
+		ereport(NOTICE,
+				errmsg("pg_z.max_size has been adjusted to %d", *newval));
 
 	return true;
 }
@@ -56,11 +76,11 @@ _PG_init(void)
 {
 	DefineCustomIntVariable(
 			"pg_z.mem_chunk_size",
-			"Memory allocation chunk size, in bytes. ",
+			"Memory allocation chunk size, in bytes.",
 			NULL,
 			&guc_memory_chunk_size,
-			256 * 1024, // default: 256kB
-			MEM_8KB,	// min: 8kB
+			256 * 1024,		  // default: 256kB
+			MIN_MEM_SIZE_8KB, // min: 8kB
 			1024 * 1024 * 1024,
 			PGC_USERSET,
 			GUC_UNIT_BYTE,
@@ -92,51 +112,53 @@ pg_z_version(PG_FUNCTION_ARGS)
 	/*
 	 * Accumulate active userspace algorithms into a clean comma-separated list
 	 */
-	char buf[256] = "pg_z v" PG_Z_VERSION " (compiled with: ";
 	bool first = true;
+	StringInfoData buf;
+	initStringInfo(&buf);
+	appendStringInfo(&buf, "pg_z v%s (compiled with: ", PG_Z_VERSION);
 
 #ifdef USE_brotli
-	strcat(buf, "brotli");
+	appendStringInfo(&buf, "brotli");
 	first = false;
 #endif
 
 #ifdef USE_gzip
 	if (!first)
-		strcat(buf, ", ");
-	strcat(buf, "gzip, deflate");
+		appendStringInfo(&buf, ", ");
+	appendStringInfo(&buf, "gzip, deflate");
 	first = false;
 #endif
 
 #ifdef USE_gzip_ng
 	if (!first)
-		strcat(buf, ", ");
-	strcat(buf, "gzip-ng, deflate-ng");
+		appendStringInfo(&buf, ", ");
+	appendStringInfo(&buf, "gzip-ng, deflate-ng");
 	first = false;
 #endif
 
 #ifdef USE_lz4
 	if (!first)
-		strcat(buf, ", ");
-	strcat(buf, "lz4");
+		appendStringInfo(&buf, ", ");
+	appendStringInfo(&buf, "lz4");
 	first = false;
 #endif
 
 #ifdef USE_snappy
 	if (!first)
-		strcat(buf, ", ");
-	strcat(buf, "snappy");
+		appendStringInfo(&buf, ", ");
+	appendStringInfo(&buf, "snappy");
 	first = false;
 #endif
 
 #ifdef USE_zstd
 	if (!first)
-		strcat(buf, ", ");
-	strcat(buf, "zstd");
+		appendStringInfo(&buf, ", ");
+	appendStringInfo(&buf, "zstd");
 #endif
 
-	strcat(buf, ")");
+	appendStringInfo(&buf, ")");
 
-	PG_RETURN_TEXT_P(cstring_to_text(buf));
+	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
 
 /*

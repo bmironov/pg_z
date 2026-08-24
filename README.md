@@ -26,6 +26,9 @@
     * [Load Test Dataset Characteristics](#load-test-dataset-characteristics)
     * [Sample Load Test Execution Output](#sample-load-test-execution-output)
 - [Preparing Static Huge Memory Pages (HMP) on the System](#preparing-static-huge-memory-pages-hmp-on-the-system)
+- [Critical Operations Warning: Hard Process Termination (SIGKILL / kill -9)](#critical-operations-warning-hard-process-termination-sigkill--kill--9)
+    * [The Risk of `kill -9`](#the-risk-of-kill--9)
+    * [Remediation](#remediation)
 - [How to Pronounce `pg_z`](#how-to-pronounce-pg_z)
 
 <!-- tocstop -->
@@ -530,6 +533,47 @@ grep HugePages_Free /proc/mem
 ```
 
 It is highly recommended to have more than zero free HMPs on such a system.
+
+## Critical Operations Warning: Hard Process Termination (SIGKILL / kill -9)
+
+This extension utilizes a hybrid memory manager that allocates **Static Huge
+Pages (HMP)** directly from the Linux kernel using `mmap()` to achieve maximum
+performance and bypass PostgreSQL allocation overhead during large stream
+processing.
+
+### The Risk of `kill -9`
+
+If a long-running query or the PostgreSQL backend process executing `pg_z` is
+forcibly terminated by a system administrator using **`kill -9`** (or any
+uncatchable `SIGKILL` signal):
+
+- **Immediate Resource Leak:** PostgreSQL will be killed instantly without running
+its internal memory context reset routines. The extension's lifecycle cleanup
+handlers (`munmap`) will **NEVER** be executed.
+- **Kernel-Level Memory Lockdown:** The allocated Huge Pages will remain locked
+inside the Linux kernel memory sub-system. They will be completely leaked, and
+neither the operating system nor a restarted PostgreSQL instance will be able
+to reclaim or reuse them automatically.
+
+### Remediation
+
+If a hard crash or `SIGKILL` occurs while processing huge payloads, the leaked
+pages will persist until one of the following actions is taken:
+
+- **System Reboot:** A full server restart will safely flush the kernel memory pool.
+- **Manual Cache Flush (Alternative):** Without rebooting the machine, a root
+  administrator can force the kernel to drop and reallocate the pinned huge
+  pages pool by cycling the system variables:
+
+```bash
+sudo sysctl -w vm.nr_hugepages=0
+sudo sysctl -w vm.nr_hugepages=<your_original_value>
+```
+
+**Best Practice:** Always use standard PostgreSQL termination tools like
+`pg_terminate_backend()` (which safely triggers a catchable signal and invokes
+our integrated `CHECK_FOR_INTERRUPTS()` macro boundaries) instead of OS-level
+hard kills.
 
 ## How to Pronounce `pg_z`
 
