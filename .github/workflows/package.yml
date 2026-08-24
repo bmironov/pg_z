@@ -1,0 +1,190 @@
+name: Build DEB and RPM Packages
+
+on:
+  push:
+    tags:
+      - '[0-9].*[0-9].*[0-9]'
+
+env:
+  ZLIB_NG_VERSION: "2.3.3"
+
+jobs:
+  # ==============================================================================
+  # Building .DEB package (Ubuntu / Debian)
+  # ==============================================================================
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Development Tools and PostgreSQL 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg2 lsb-release
+          sudo sh -c 'echo "deb http://postgresql.org $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://postgresql.org | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install -y devscripts debhelper postgresql-server-dev-18 \
+            libbrotli-dev liblz4-dev libsnappy-dev libzstd-dev zlib1g-dev cmake build-essential
+
+      - name: Compile Static zlib-ng for DEB Build
+        run: |
+          cd /tmp
+          wget "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/{{ env.ZLIB_NG_VERSION }}.tar.gz"
+          tar -xzf "${{ env.ZLIB_NG_VERSION }}.tar.gz" && cd "zlib-ng-${{ env.ZLIB_NG_VERSION }}"
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng
+          cmake --build . --parallel $(nproc)
+          sudo cmake --install .
+
+      - name: Build Debian Package
+        env:
+          C_INCLUDE_PATH: /opt/zlib-ng/include
+          CPATH: /opt/zlib-ng/include
+          LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
+        run: |
+          mkdir -p debian
+          cat << 'EOF' > debian/control
+          Source: pg-z
+          Section: database
+          Priority: optional
+          Maintainer: AI Packer <pack@example.com>
+          Build-Depends: debhelper-compat (= 13), postgresql-server-dev-18, autoconf, automake
+          Standards-Version: 4.6.0
+
+          Package: postgresql-18-pg-z
+          Architecture: any
+          Depends: ${shlibs:Depends}, ${misc:Depends}, postgresql-18
+          Description: Modern compression algorithms for PostgreSQL 18
+          EOF
+
+          cat << 'EOF' > debian/rules
+          #!/usr/bin/make -f
+          %:
+          	dh $@
+          override_dh_auto_configure:
+          	autoreconf -if
+          	./configure --with-link-gzip-ng=static
+          override_dh_auto_install:
+          	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
+          EOF
+          chmod +x debian/rules
+          echo "13" > debian/compat
+          dpkg-buildpackage -us -uc -b
+
+      - name: Upload DEB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgresql-18-pg-z-deb
+          path: ../*.deb
+
+  # ==============================================================================
+  # Building .RPM package (Rocky Linux / RHEL 9)
+  # ==============================================================================
+  build-rpm:
+    runs-on: ubuntu-latest
+    container: rockylinux:9
+    steps:
+      - name: Install Git and Basics in Container
+        run: dnf install -y git wget shadow-utils
+
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install PGDG Repository and Toolchain
+        run: |
+          dnf install -y https://postgresql.org
+          dnf -qy module disable postgresql
+          dnf install -y --nogpgcheck postgresql18-devel
+          dnf install -y gcc make autoconf automake cmake brotli-devel lz4-devel snappy-devel libzstd-devel zlib-devel rpm-build rpmdevtools
+
+      - name: Compile Static zlib-ng for RPM Build
+        run: |
+          cd /tmp
+          wget "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/{{ env.ZLIB_NG_VERSION }}.tar.gz"
+          tar -xzf "${{ env.ZLIB_NG_VERSION }}.tar.gz" && cd "zlib-ng-${{ env.ZLIB_NG_VERSION }}"
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng
+          cmake --build . --parallel $(nproc)
+          cmake --install .
+
+      - name: Build RPM Package
+        env:
+          C_INCLUDE_PATH: /opt/zlib-ng/include
+          CPATH: /opt/zlib-ng/include
+          LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
+        run: |
+          rpmdev-setuptree
+          TAR_DIR="/tmp/pg_z-1.0"
+          mkdir -p $TAR_DIR
+          cp -r ./* $TAR_DIR/
+          cd /tmp && tar -czf ~/rpmbuild/SOURCES/pg_z-1.0.tar.gz pg_z-1.0 && cd -
+
+          cat << 'EOF' > pg_z.spec
+          Name:           postgresql18-pg_z
+          Version:        1.0
+          Release:        1%{?dist}
+          Summary:        Modern compression algorithms for PostgreSQL 18
+          License:        MIT
+          URL:            https://github.com
+          Source0:        pg_z-1.0.tar.gz
+          BuildRequires:  gcc make autoconf automake postgresql18-devel
+          Requires:       postgresql18-server
+          %description
+          Modern compression algorithms for PostgreSQL 18 (Brotli, LZ4, Snappy, Zstd, static zlib-ng)
+          %prep
+          %setup -q -n pg_z-1.0
+          %build
+          autoreconf -if
+          ./configure PG_CONFIG=/usr/pgsql-18/bin/pg_config --with-link-gzip-ng=static
+          make %{?_smp_mflags}
+          %install
+          rm -rf %{buildroot}
+          make install DESTDIR=%{buildroot}
+          %files
+          /usr/pgsql-18/lib/pg_z.so
+          /usr/pgsql-18/share/extension/pg_z.control
+          /usr/pgsql-18/share/extension/pg_z--*.sql
+          /usr/pgsql-18/lib/bitcode/pg_z*
+          EOF
+
+          rpmbuild -ba pg_z.spec
+
+      - name: Upload RPM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgresql-18-pg-z-rpm
+          path: /root/rpmbuild/RPMS/x86_64/*.rpm
+
+  # ==============================================================================
+  # PUBLISH TO GITHUB RELEASES
+  # ==============================================================================
+  create-release:
+    needs: [build-deb, build-rpm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download DEB Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: postgresql-18-pg-z-deb
+          path: ./artifacts
+
+      - name: Download RPM Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: postgresql-18-pg-z-rpm
+          path: ./artifacts
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            ./artifacts/*.deb
+            ./artifacts/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
