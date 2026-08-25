@@ -241,7 +241,7 @@ jobs:
           git config --global --add safe.directory '*'
 
           echo "RPM_PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config" >> $GITHUB_ENV
-          echo "RPM_PG_PATH=/usr/pgsql-${MATRIX_PG}/bin" >> $GITHUB_ENV
+          echo "PATH=/usr/pgsql-${MATRIX_PG}/bin:$PATH" >> $GITHUB_ENV
           
           LIBS_LINKING="--with-link-brotli=dynamic --with-link-lz4=dynamic"
           LIBS_LINKING="$LIBS_LINKING --with-link-zstd=dynamic --with-link-snappy=dynamic"
@@ -252,18 +252,15 @@ jobs:
 
       - name: Build RPM Package
         run: |
-          # Safe path expansion variables for compiler environment targets
-          if [ -n "$C_INCLUDE_PATH" ]; then export C_INCLUDE_PATH="$C_INCLUDE_PATH:/opt/zlib-ng/include"; else export C_INCLUDE_PATH="/opt/zlib-ng/include"; fi
-          if [ -n "$CPATH" ]; then export CPATH="$CPATH:/opt/zlib-ng/include"; else export CPATH="/opt/zlib-ng/include"; fi
-          if [ -n "$LIBRARY_PATH" ]; then export LIBRARY_PATH="$LIBRARY_PATH:/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; else export LIBRARY_PATH="/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; fi
-
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "${PKG_VERSION}")
+          echo "Real Git Version identified as: ${VERSION_TAG}"
           
           # Set up standard RPM builder tree directories path structure
           rpmdev-setuptree
           TAR_DIR="/tmp/pg_z-${PKG_VERSION}"
           mkdir -p $TAR_DIR
           cp -r ./* $TAR_DIR/
+          echo "${VERSION_TAG}" > $TAR_DIR/VERSION
 
           # Physically inject official system Autotools scripts into the tarball folder.
           # This bypasses Automake constraints and ensures absolute isolation compliance.
@@ -277,7 +274,6 @@ jobs:
           # Generate valid .spec deployment manifest descriptor file context properties
           cat << EOF > pg_z.spec
           %define pg_config_path ${{ env.RPM_PG_CONFIG }}
-          %define pg_bin_path    ${{ env.RPM_PG_PATH }}
           
           Name:           postgresql${MATRIX_PG}-pg_z
           Version:        ${PKG_VERSION}
@@ -298,7 +294,7 @@ jobs:
           %build
           autoconf
           
-          PATH=%{pg_bin_path}:\$PATH ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+          ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
             LIBS="-lpthread -lm"
