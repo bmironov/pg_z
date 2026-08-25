@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false # Failure in one build doesn't fail others
       matrix:
-        debian_version: ["trixie"] # Debian 12 (bookworm), 13 (trixie)
+        debian_version: ["bookworm", "trixie"] # Debian 12 (bookworm), 13 (trixie)
         pg_version: ["18"]         # PostgreSQL versions
 
     container: debian:${{ matrix.debian_version }}
