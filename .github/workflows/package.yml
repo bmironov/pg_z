@@ -59,6 +59,7 @@ jobs:
           echo | /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
           # Refresh package indexing matrices using the newly registered secure channel mirrors
           apt-get update
+          apt-get install -y --reinstall libc6-dev
           # Install debian package compiler targets alongside PostgreSQL 18 backend server development tools
           apt-get install -y git devscripts debhelper postgresql-server-dev-18 \
             libbrotli-dev liblz4-dev libsnappy-dev libzstd-dev cmake build-essential autoconf automake
@@ -129,11 +130,14 @@ jobs:
           chmod +x debian/rules
           dpkg-buildpackage -us -uc -b
 
+          # pickup generated files and copy them one level deeper for the "upload-artifacts" step
+          mv ../*.deb .
+
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v7
         with:
           name: postgresql-18-pg-z-deb
-          path: ${{ github.workspace }}/../*.deb
+          path: *.deb
 
   # ==============================================================================
   # Building .RPM package (Rocky Linux / RHEL 9)
