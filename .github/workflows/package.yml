@@ -117,7 +117,9 @@ jobs:
           	dh $@
           override_dh_auto_configure:
           	autoreconf -if
-          	./configure
+          	./configure --prefix=/usr
+          override_dh_auto_build:
+          	make
           override_dh_auto_install:
           	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
           EOF
