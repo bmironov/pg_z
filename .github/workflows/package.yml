@@ -288,22 +288,30 @@ jobs:
       - name: Download DEB Artifact
         uses: actions/download-artifact@v4
         with:
-          name: postgresql-18-pg-z-deb
+          name: pg*-pg-z-*-deb
           path: ./artifacts
 
       - name: Download RPM Artifact
         uses: actions/download-artifact@v4
         with:
-          name: postgresql-18-pg-z-rpm
+          name: pg*-pg-z-*-rpm
           path: ./artifacts
 
       - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_tag.outputs.TARGET_TAG }}
-          files: |
+          name: Release ${{ steps.get_tag.outputs.TARGET_TAG }}
+          body: |
+            Automated extension release for PostgreSQL (Matrix Build).
+            
+            ### Supported Architectures:
+            * Debian 12 (Bookworm) - PG 16, 17, 18
+            * Debian 13 (Trixie) - PG 16, 17, 18
+          draft: false
+          prerelease: false
+          files:
             ./artifacts/*.deb
             ./artifacts/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
