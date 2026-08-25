@@ -199,6 +199,13 @@ jobs:
       - name: Install PGDG Repository and Toolchain
         run: |
           dnf install -y epel-release
+
+          # Enable CRB / PowerTools repositories (required for build headers)
+          dnf config-manager --set-enabled crb || dnf config-manager --set-enabled PowerTools
+          
+          # CRITICAL FIX FOR ROCKY 8: Enable the 'devel' repository where perl-IPC-Run lives
+          dnf config-manager --set-enabled devel || true
+
           dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-${MATRIX_ROCKY}-x86_64/pgdg-redhat-repo-latest.noarch.rpm
           dnf install -y postgresql${MATRIX_PG}-devel
           
