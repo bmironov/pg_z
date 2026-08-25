@@ -272,6 +272,10 @@ jobs:
           
           %build
           autoreconf -ivf --install
+          if [ ! -f install-sh ]; then
+            cp /usr/share/automake-*/install-sh ./ 2>/dev/null || echo '#!/bin/sh' > install-sh
+            chmod +x install-sh
+          fi
 
           # Forward standard libraries linking markers directly as script parameters arguments configurations entries
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${CONFIGURE_EXTRA_FLAGS} \
