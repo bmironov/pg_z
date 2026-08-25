@@ -95,7 +95,7 @@ jobs:
            -- AI Packer <pack@example.com>  ${DEB_DATE}
           EOF
 
-          cat << 'EOF' > debian/control
+          cat << EOF_C > debian/control
           Source: pg-z
           Section: database
           Priority: optional
@@ -107,11 +107,11 @@ jobs:
           Architecture: any
           Depends: ${shlibs:Depends}, ${misc:Depends}, postgresql-18
           Description: Modern compression algorithms for PostgreSQL 18
-          EOF
+          EOF_C
 
-          cat << 'EOF' > debian/rules
+          cat << EOF_R > debian/rules
           #!/usr/bin/make -f
-          export GIT_VERSION = $(PKG_VERSION)
+          export GIT_VERSION = ${PKG_VERSION}
           export DEB_CFLAGS_MAINT_APPEND = -I/opt/zlib-ng/include -I/usr/include
           export DEB_LDFLAGS_MAINT_APPEND = -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib
 
@@ -119,25 +119,25 @@ jobs:
           	dh $@
           override_dh_auto_configure:
           	autoreconf -if
-          	./configure --prefix=/usr\
+          	./configure --prefix=/usr \
           	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include" \
           	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib"
           override_dh_auto_build:
           	make
           override_dh_auto_install:
           	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
-          EOF
+          EOF_R
           chmod +x debian/rules
           dpkg-buildpackage -us -uc -b
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
-          mv ../*.deb .
+          mv ../*.deb ./
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v7
         with:
           name: postgresql-18-pg-z-deb
-          path: *.deb
+          path: "*.deb"
 
   # ==============================================================================
   # Building .RPM package (Rocky Linux / RHEL 9)
