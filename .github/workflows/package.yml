@@ -1,4 +1,4 @@
-name: Build DEB and RPM Packages
+name: Build and Package pg_z Postgres Extension
 
 on:
   push:
@@ -10,12 +10,39 @@ env:
   ZLIB_NG_VERSION: "2.3.3"
 
 jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      git_tag: ${{ steps:vars.outputs.GIT_TAG }}
+      pkg_version: ${{ steps:vars.outputs.PKG_VERSION }}
+      deb_date: ${{ steps:vars.outputs.DEB_DATE }}
+      rpm_date: ${{ steps:vars.outputs.RPM_DATE }}
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Calculate Variables
+        id: vars
+        run: |
+          GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
+          PKG_VERSION=$$(echo $GIT_TAG)
+          
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_OUTPUT
+          echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
+          echo "DEB_DATE=$(date -R)" >> $GITHUB_OUTPUT
+          echo "RPM_DATE=$(date +'%a %b %d %Y')" >> $GITHUB_OUTPUT
+
   # ==============================================================================
   # Building .DEB package (Ubuntu / Debian)
   # ==============================================================================
   build-deb:
     runs-on: ubuntu-latest
     container: debian:trixie
+    env:
+      GIT_TAG: ${{ needs.init.outputs.git_tag }}
+      PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
+      DEB_DATE: ${{ needs.init.outputs.deb_date }}
     steps:
       - name: Install Core Version Control Tools
         run: |
@@ -52,6 +79,14 @@ jobs:
           LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
         run: |
           mkdir -p debian
+          cat << EOF > debian/changelog
+          pg_z (${PKG_VERSION}) trixiel; urgency=low
+
+            * Automated build from git tag ${GIT_TAG}.
+
+           -- AI Packer <pack@example.com>  ${DEB_DATE}
+          EOF
+
           cat << 'EOF' > debian/control
           Source: pg-z
           Section: database
@@ -72,7 +107,7 @@ jobs:
           	dh $@
           override_dh_auto_configure:
           	autoreconf -if
-          	./configure --with-link-gzip-ng=static
+          	./configure
           override_dh_auto_install:
           	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
           EOF
@@ -92,6 +127,10 @@ jobs:
   build-rpm:
     runs-on: ubuntu-latest
     container: rockylinux:9
+    env:
+      GIT_TAG: ${{ needs.init.outputs.git_tag }}
+      PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
+      RPM_DATE: ${{ needs.init.outputs.rpm_date }}
     steps:
       - name: Install Git and Basics in Container
         run: dnf install -y git wget shadow-utils
