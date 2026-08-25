@@ -286,9 +286,8 @@ jobs:
           %setup -q -n pg_z-${PKG_VERSION}
           
           %build
-          autoreconf -if
-          automake --add-missing --copy || true
-
+          autoreconf -ivf --install
+          
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
