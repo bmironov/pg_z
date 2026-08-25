@@ -167,7 +167,7 @@ jobs:
           path: "*.deb"
 
   # ==============================================================================
-  # Building .RPM package (Rocky Linux 8 - 10) and Postgres 16 - 18
+  # Building .RPM package (Rocky Linux 8 - 9) and Postgres 16 - 18
   # ==============================================================================
   build-rpm:
     needs: init
@@ -176,7 +176,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rocky_version: ["8", "9", "10"]       # Supports Rocky Linux 8 - 10
+        rocky_version: ["8", "9"]       # Supports Rocky Linux 8 - 9
         pg_version: ["18"]  # Target PostgreSQL major versions
 
     container: rockylinux:${{ matrix.rocky_version }}
@@ -219,7 +219,7 @@ jobs:
       - name: Compile Static zlib-ng for RPM Build
         run: |
           cd /tmp
-          wget "https://github.com{ZLIB_NG_VERSION}.tar.gz"
+          wget "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz"
           tar -xzf "${ZLIB_NG_VERSION}.tar.gz" && cd "zlib-ng-${ZLIB_NG_VERSION}"
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng
