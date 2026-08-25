@@ -271,7 +271,9 @@ jobs:
           %setup -q -n pg_z-${PKG_VERSION}
           
           %build
-          autoreconf -if
+          autoreconf -ivf
+          automake --add-missing --copy 2>/dev/null || true
+          
           # Forward standard libraries linking markers directly as script parameters arguments configurations entries
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${CONFIGURE_EXTRA_FLAGS} \
             CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
