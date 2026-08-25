@@ -44,8 +44,8 @@ jobs:
     strategy:
       fail-fast: false # Failure in one build doesn't fail others
       matrix:
-        debian_version: ["bookworm", "trixie"] # Debian 12 and 13
-        pg_version: ["16", "17", "18"]         # PostgreSQL versions
+        debian_version: ["trixie"] # Debian 12 (bookworm), 13 (trixie)
+        pg_version: ["18"]         # PostgreSQL versions
 
     container: debian:${{ matrix.debian_version }}
     env:
@@ -136,7 +136,7 @@ jobs:
             EXTRA_CONF_FLAGS=""; \
             if [ "${MATRIX_DEBIAN}" = "bookworm" ]; then \
           	  EXTRA_CONF_FLAGS="--with-link-zstd=dynamic --with-link-lz4=dynamic"; \
-          	fi; \
+          	fi
           	./configure --prefix=/usr \$\$EXTRA_CONF_FLAGS \
           	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
           	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib -pthread" \
