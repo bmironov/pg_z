@@ -80,11 +80,13 @@ jobs:
           PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
           DEB_DATE: ${{ needs.init.outputs.deb_date }}
         run: |
-          export C_INCLUDE_PATH="${C_INCLUDE_PATH:+$C_INCLUDE_PATH:}/opt/zlib-ng/include"
-          export CPATH="${CPATH:+$CPATH:}/opt/zlib-ng/include"
-          export LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}/opt/zlib-ng/lib64:/opt/zlib-ng/lib"
+          if [ -n "$C_INCLUDE_PATH" ]; then export C_INCLUDE_PATH="$C_INCLUDE_PATH:/opt/zlib-ng/include"; else export C_INCLUDE_PATH="/opt/zlib-ng/include"; fi
+          if [ -n "$CPATH" ]; then export CPATH="$CPATH:/opt/zlib-ng/include"; else export CPATH="/opt/zlib-ng/include"; fi
+          if [ -n "$LIBRARY_PATH" ]; then export LIBRARY_PATH="$LIBRARY_PATH:/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; else export LIBRARY_PATH="/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; fi
+
           git config --global --add safe.directory ${{ github.workspace }}
           git config --global --add safe.directory /__w/pg_z/pg_z
+
           echo "Current code version based on Git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.1')"
           mkdir -p debian
           cat << EOF > debian/changelog
@@ -95,7 +97,7 @@ jobs:
            -- AI Packer <pack@example.com>  ${DEB_DATE}
           EOF
 
-          cat << EOF_C > debian/control
+          cat << EOF > debian/control
           Source: pg-z
           Section: database
           Priority: optional
@@ -105,9 +107,9 @@ jobs:
 
           Package: postgresql-18-pg-z
           Architecture: any
-          Depends: ${shlibs:Depends}, ${misc:Depends}, postgresql-18
-          Description: Modern compression algorithms for PostgreSQL 18
-          EOF_C
+          Depends: \${shlibs:Depends}, \${misc:Depends}, postgresql-18
+          Description: Collection of userspace functions providing access to compression algorithms inside PostgreSQL 18
+          EOF
 
           cat << EOF_R > debian/rules
           #!/usr/bin/make -f
@@ -125,7 +127,7 @@ jobs:
           override_dh_auto_build:
           	make
           override_dh_auto_install:
-          	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
+          	make install DESTDIR=\$(CURDIR)/debian/postgresql-18-pg-z
           EOF_R
           chmod +x debian/rules
           dpkg-buildpackage -us -uc -b
