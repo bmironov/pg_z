@@ -28,7 +28,7 @@ jobs:
       - name: Install Official PGDG Repository and PostgreSQL 18 Header Toolchains
         run: |
           apt install -y postgresql-common
-          /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+          echo | /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
 
           # Create the official structural keyrings directory layout
           #install -d /usr/share/postgresql-common/pgdg
