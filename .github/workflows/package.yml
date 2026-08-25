@@ -167,7 +167,7 @@ jobs:
           path: "*.deb"
 
   # ==============================================================================
-  # Building .RPM package (Rocky Linux 8 / 9) and Postgres 16, 17, 18
+  # Building .RPM package (Rocky Linux 8 - 10) and Postgres 16 - 18
   # ==============================================================================
   build-rpm:
     needs: init
@@ -176,8 +176,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rocky_version: ["8", "9"]       # Supports Rocky Linux 8 and 9
-        pg_version: ["16", "17", "18"]  # Target PostgreSQL major versions
+        rocky_version: ["8", "9", "10"]       # Supports Rocky Linux 8 - 10
+        pg_version: ["18"]  # Target PostgreSQL major versions
 
     container: rockylinux:${{ matrix.rocky_version }}
     env:
@@ -199,11 +199,8 @@ jobs:
       - name: Install PGDG Repository and Toolchain
         run: |
           dnf install -y epel-release
-          # CRB repository name differs between EL8 (PowerTools) and EL9 (crb)
-          dnf config-manager --set-enabled crb || dnf config-manager --set-enabled PowerTools
-          
-          # Fetch the universal rolling-release PGDG RPM repository layout configuration
-          dnf install -y https://postgresql.org{MATRIX_ROCKY}-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+          dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-${MATRIX_ROCKY}-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+          dnf install -y postgresql${MATRIX_PG}-devel
           
           # Disable OS-native appstream postgresql modules to prevent conflict packages
           dnf -qy module disable postgresql || true
