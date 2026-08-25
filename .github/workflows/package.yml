@@ -133,6 +133,10 @@ jobs:
           	dh \$@
           override_dh_auto_configure:
           	autoreconf -if
+            EXTRA_CONF_FLAGS=""; \
+            if [ "${MATRIX_DEBIAN}" = "bookworm" ]; then \
+          	  EXTRA_CONF_FLAGS="--with-link-zstd=dynamic --with-link-lz4=dynamic"; \
+          	fi; \
           	./configure --prefix=/usr \
           	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
           	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib -pthread" \
