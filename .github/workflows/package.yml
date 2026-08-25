@@ -29,24 +29,10 @@ jobs:
         run: |
           apt install -y postgresql-common
           echo | /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
-
-          # Create the official structural keyrings directory layout
-          #install -d /usr/share/postgresql-common/pgdg
-          # Download the authenticated repository public ASCII cryptographic signature key
-          #curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://postgresql.org
-          # Generate the native declarative DEB822 pgdg.sources configuration block directly
-          #cat << 'EOF' > /etc/apt/sources.list.d/pgdg.sources
-          #Types: deb deb-src
-          #URIs: https://postgresql.org
-          #Suites: trixie-pgdg
-          #Architectures: amd64
-          #Components: main
-          #Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
-          #EOF
           # Refresh package indexing matrices using the newly registered secure channel mirrors
           apt-get update
           # Install debian package compiler targets alongside PostgreSQL 18 backend server development tools
-          apt-get install -y devscripts debhelper postgresql-server-dev-18 \
+          apt-get install -y git devscripts debhelper postgresql-server-dev-18 \
             libbrotli-dev liblz4-dev libsnappy-dev libzstd-dev cmake build-essential autoconf automake
 
       - name: Compile Static zlib-ng for DEB Build
