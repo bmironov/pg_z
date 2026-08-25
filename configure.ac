@@ -140,7 +140,7 @@ AC_DEFUN([MY_CHECK_LIB], [
 # --- Brotli ---
 AS_IF([test "x$with_brotli" = "xyes"], [
     MODE="$BROTLI"
-    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
+    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliGetDictionary])
     MY_CHECK_LIB([brotli_e], [libbrotli], [brotlienc],    [BrotliEncoderCreateInstance])
     MY_CHECK_LIB([brotli_d], [libbrotli], [brotlidec],    [BrotliDecoderCreateInstance])
     AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
