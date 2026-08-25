@@ -143,7 +143,7 @@ jobs:
           %:
           	dh \$@
           override_dh_auto_configure:
-          	autoreconf -if
+          	autoreconf -ifv --install
           	./configure --prefix=/usr ${CONFIGURE_EXTRA_FLAGS} \
           	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
           	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib -pthread" \
@@ -271,9 +271,8 @@ jobs:
           %setup -q -n pg_z-${PKG_VERSION}
           
           %build
-          autoreconf -ivf
-          automake --add-missing --copy 2>/dev/null || true
-          
+          autoreconf -ivf --install
+
           # Forward standard libraries linking markers directly as script parameters arguments configurations entries
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${CONFIGURE_EXTRA_FLAGS} \
             CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
