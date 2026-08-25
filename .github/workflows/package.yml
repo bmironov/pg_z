@@ -136,6 +136,8 @@ jobs:
           dpkg-buildpackage -us -uc -b
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
+          DEB_ARCH=$(dpkg --print-architecture)
+          mv ../postgresql-18-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-18-pg-z_${PKG_VERSION}-1.trixie_${DEB_ARCH}.deb
           mv ../*.deb ./
 
       - name: Upload DEB Artifact
