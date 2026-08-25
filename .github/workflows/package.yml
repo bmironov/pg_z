@@ -240,6 +240,9 @@ jobs:
           # Grant workspace visibility access permissions under root container environment
           git config --global --add safe.directory '*'
 
+          echo "RPM_PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config" >> $GITHUB_ENV
+          echo "RPM_PG_PATH=/usr/pgsql-${MATRIX_PG}/bin" >> $GITHUB_ENV
+          
           LIBS_LINKING="--with-link-brotli=dynamic --with-link-lz4=dynamic"
           LIBS_LINKING="$LIBS_LINKING --with-link-zstd=dynamic --with-link-snappy=dynamic"
           echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
@@ -273,6 +276,9 @@ jobs:
 
           # Generate valid .spec deployment manifest descriptor file context properties
           cat << EOF > pg_z.spec
+          %define pg_config_path ${{ env.RPM_PG_CONFIG }}
+          %define pg_bin_path    ${{ env.RPM_PG_PATH }}
+          
           Name:           postgresql${MATRIX_PG}-pg_z
           Version:        ${PKG_VERSION}
           Release:        1.el${MATRIX_ROCKY}%{?dist}
@@ -292,15 +298,15 @@ jobs:
           %build
           autoconf
           
-          ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+          PATH=%{pg_bin_path}:\$PATH ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
             LIBS="-lpthread -lm"
-          make %{?_smp_mflags}
+          make PG_CONFIG=%{pg_config_path}
           
           %install
           rm -rf %{buildroot}
-          make install DESTDIR=%{buildroot}
+          make install DESTDIR=%{buildroot} PG_CONFIG=%{pg_config_path}
           
           %files
           /usr/pgsql-${MATRIX_PG}/lib/pg_z.so
