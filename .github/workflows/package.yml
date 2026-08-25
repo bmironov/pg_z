@@ -123,7 +123,8 @@ jobs:
           	autoreconf -if
           	./configure --prefix=/usr \
           	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include" \
-          	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib"
+          	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib" \
+              LIBS="-lpthread -lm"
           override_dh_auto_build:
           	make
           override_dh_auto_install:
