@@ -62,7 +62,7 @@ jobs:
           apt-get install -y --reinstall libc6-dev
           # Install debian package compiler targets alongside PostgreSQL 18 backend server development tools
           apt-get install -y git devscripts debhelper postgresql-server-dev-18 \
-            libbrotli-dev liblz4-dev libsnappy-dev libzstd-dev cmake build-essential autoconf automake
+            libbrotli-dev zlib1g-dev liblz4-dev libsnappy-dev libzstd-dev cmake build-essential autoconf automake
 
       - name: Compile Static zlib-ng for DEB Build
         run: |
@@ -122,8 +122,8 @@ jobs:
           override_dh_auto_configure:
           	autoreconf -if
           	./configure --prefix=/usr \
-          	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include" \
-          	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib" \
+          	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
+          	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib -pthread" \
               LIBS="-lpthread -lm"
           override_dh_auto_build:
           	make
