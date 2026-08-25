@@ -91,7 +91,7 @@ jobs:
         run: |
           EXTRA_FLAGS=""
           if [ "${MATRIX_DEBIAN}" = "bookworm" ]; then
-            EXTRA_FLAGS="--with-link-brotli=dynamic --with-link-zstd=dynamic --with-link-lz4=dynamic"
+            EXTRA_FLAGS="--with-link-zstd=dynamic --with-link-lz4=dynamic"
           fi
           
           # Save henerated flags to use in next step
