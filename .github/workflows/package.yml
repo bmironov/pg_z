@@ -74,6 +74,10 @@ jobs:
           cmake --install .
 
       - name: Build Debian Package
+        env:
+          GIT_TAG: ${{ needs.init.outputs.git_tag }}
+          PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
+          DEB_DATE: ${{ needs.init.outputs.deb_date }}
         run: |
           export C_INCLUDE_PATH="${C_INCLUDE_PATH:+$C_INCLUDE_PATH:}/opt/zlib-ng/include"
           export CPATH="${CPATH:+$CPATH:}/opt/zlib-ng/include"
@@ -103,13 +107,15 @@ jobs:
 
           cat << 'EOF' > debian/rules
           #!/usr/bin/make -f
+          export GIT_VERSION = $(PKG_VERSION)
           export DEB_CFLAGS_MAINT_APPEND = -I/opt/zlib-ng/include -I/usr/include
           export DEB_LDFLAGS_MAINT_APPEND = -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib
+
           %:
           	dh $@
           override_dh_auto_configure:
           	autoreconf -if
-          	./configure
+          	./configure CFLAGS="$(CFLAGS) $(DEB_CFLAGS_MAINT_APPEND)" LDFLAGS="$(LDFLAGS) $(DEB_LDFLAGS_MAINT_APPEND)"
           override_dh_auto_install:
           	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
           EOF
@@ -120,7 +126,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: postgresql-18-pg-z-deb
-          path: ../*.deb
+          path: ${{ github.workspace }}/../*.deb
 
   # ==============================================================================
   # Building .RPM package (Rocky Linux / RHEL 9)
