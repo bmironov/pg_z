@@ -43,7 +43,7 @@ jobs:
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng
           cmake --build . --parallel $(nproc)
-          sudo cmake --install .
+          cmake --install .
 
       - name: Build Debian Package
         env:
