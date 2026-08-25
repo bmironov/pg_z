@@ -250,6 +250,10 @@ jobs:
           TAR_DIR="/tmp/pg_z-${PKG_VERSION}"
           mkdir -p $TAR_DIR
           cp -r ./* $TAR_DIR/
+
+          touch $TAR_DIR/Makefile.am
+          touch $TAR_DIR/tmp/Makefile.am
+          
           cd /tmp && tar -czf ~/rpmbuild/SOURCES/pg_z-${PKG_VERSION}.tar.gz pg_z-${PKG_VERSION} && cd -
 
           # Generate valid .spec deployment manifest descriptor file context properties
@@ -265,18 +269,14 @@ jobs:
           Requires:       postgresql${MATRIX_PG}-server
           
           %description
-          Modern compression algorithms for PostgreSQL ${MATRIX_PG} (Brotli, LZ4, Snappy, Zstd, static zlib-ng)
+          Collection of userspace functions providing access to compression algorithms inside PostgreSQL ${MATRIX_PG}
           
           %prep
           %setup -q -n pg_z-${PKG_VERSION}
           
           %build
           autoreconf -ivf --install
-          if [ ! -f install-sh ]; then
-            cp /usr/share/automake-*/install-sh ./ 2>/dev/null || echo '#!/bin/sh' > install-sh
-            chmod +x install-sh
-          fi
-
+         
           # Forward standard libraries linking markers directly as script parameters arguments configurations entries
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${CONFIGURE_EXTRA_FLAGS} \
             CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
