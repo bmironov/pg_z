@@ -38,8 +38,8 @@ jobs:
       - name: Compile Static zlib-ng for DEB Build
         run: |
           cd /tmp
-          wget "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/{{ env.ZLIB_NG_VERSION }}.tar.gz"
-          tar -xzf "${{ env.ZLIB_NG_VERSION }}.tar.gz" && cd "zlib-ng-${{ env.ZLIB_NG_VERSION }}"
+          wget "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz"
+          tar -xzf "${ZLIB_NG_VERSION}.tar.gz" && cd "zlib-ng-${ZLIB_NG_VERSION}"
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng
           cmake --build . --parallel $(nproc)
