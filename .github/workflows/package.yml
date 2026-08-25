@@ -82,6 +82,8 @@ jobs:
           export C_INCLUDE_PATH="${C_INCLUDE_PATH:+$C_INCLUDE_PATH:}/opt/zlib-ng/include"
           export CPATH="${CPATH:+$CPATH:}/opt/zlib-ng/include"
           export LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}/opt/zlib-ng/lib64:/opt/zlib-ng/lib"
+          git config --global --add safe.directory ${{ github.workspace }}
+          echo "Current code version based on Git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.1')"
           mkdir -p debian
           cat << EOF > debian/changelog
           pg-z (${PKG_VERSION}-1) trixiel; urgency=low
@@ -115,7 +117,7 @@ jobs:
           	dh $@
           override_dh_auto_configure:
           	autoreconf -if
-          	./configure CFLAGS="$(CFLAGS) $(DEB_CFLAGS_MAINT_APPEND)" LDFLAGS="$(LDFLAGS) $(DEB_LDFLAGS_MAINT_APPEND)"
+          	./configure
           override_dh_auto_install:
           	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
           EOF
@@ -123,7 +125,7 @@ jobs:
           dpkg-buildpackage -us -uc -b
 
       - name: Upload DEB Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: postgresql-18-pg-z-deb
           path: ${{ github.workspace }}/../*.deb
