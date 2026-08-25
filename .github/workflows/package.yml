@@ -287,7 +287,7 @@ jobs:
           
           %build
           autoreconf -if
-          automake --add-missing --copy 2>/dev/null || true
+          automake --add-missing --copy || true
 
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
