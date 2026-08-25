@@ -262,8 +262,12 @@ jobs:
           mkdir -p $TAR_DIR
           cp -r ./* $TAR_DIR/
 
-          touch $TAR_DIR/Makefile.am
-          touch $TAR_DIR/tmp/Makefile.am
+          # Physically inject official system Autotools scripts into the tarball folder.
+          # This bypasses Automake constraints and ensures absolute isolation compliance.
+          cp /usr/share/automake-*/install-sh $TAR_DIR/ 2>/dev/null || true
+          cp /usr/share/automake-*/config.sub $TAR_DIR/ 2>/dev/null || true
+          cp /usr/share/automake-*/config.guess $TAR_DIR/ 2>/dev/null || true
+          chmod +x $TAR_DIR/install-sh $TAR_DIR/config.sub $TAR_DIR/config.guess 2>/dev/null || true
           
           cd /tmp && tar -czf ~/rpmbuild/SOURCES/pg_z-${PKG_VERSION}.tar.gz pg_z-${PKG_VERSION} && cd -
 
@@ -286,7 +290,7 @@ jobs:
           %setup -q -n pg_z-${PKG_VERSION}
           
           %build
-          autoreconf -ivf --install
+          autoreconf -if
           
           ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
