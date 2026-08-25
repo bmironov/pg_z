@@ -240,7 +240,10 @@ jobs:
           # Grant workspace visibility access permissions under root container environment
           git config --global --add safe.directory '*'
 
-          echo "CONFIGURE_EXTRA_FLAGS=--with-link-brotli=dynamic --with-link-lz4=dynamic --with-link-zstd=dynamic --with-link-snappy=dynamic" >> $GITHUB_EN
+          LIBS_LINKING="--with-link-brotli=dynamic --with-link-lz4=dynamic"
+          LIBS_LINKING="$LIBS_LINKING --with-link-zstd=dynamic --with-link-snappy=dynamic"
+          echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
+
           echo "RPM_CFLAGS=${RPM_CFLAGS} -I/usr/include" >> $GITHUB_ENV
           echo "RPM_LDFLAGS=${RPM_LDFLAGS} -L/usr/lib64 -L/usr/lib" >> $GITHUB_ENV
 
