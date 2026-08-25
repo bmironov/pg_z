@@ -74,13 +74,16 @@ jobs:
 
       - name: Build Debian Package
         env:
+          GIT_TAG: ${{ needs.init.outputs.git_tag }}
+          PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
+          DEB_DATE: ${{ needs.init.outputs.deb_date }}
           C_INCLUDE_PATH: /opt/zlib-ng/include
           CPATH: /opt/zlib-ng/include
           LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
         run: |
           mkdir -p debian
           cat << EOF > debian/changelog
-          pg_z (${PKG_VERSION}) trixiel; urgency=low
+          pg-z (${PKG_VERSION}-1) trixiel; urgency=low
 
             * Automated build from git tag ${GIT_TAG}.
 
@@ -165,6 +168,9 @@ jobs:
 
       - name: Build RPM Package
         env:
+          GIT_TAG: ${{ needs.init.outputs.git_tag }}
+          PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
+          DEB_DATE: ${{ needs.init.outputs.deb_date }}
           C_INCLUDE_PATH: /opt/zlib-ng/include
           CPATH: /opt/zlib-ng/include
           LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
