@@ -37,6 +37,7 @@ jobs:
   # Building .DEB package (Ubuntu / Debian)
   # ==============================================================================
   build-deb:
+    needs: init
     runs-on: ubuntu-latest
     container: debian:trixie
     env:
@@ -80,11 +81,11 @@ jobs:
         run: |
           mkdir -p debian
           cat << EOF > debian/changelog
-          pg-z (${{ needs.init.outputs.pkg_version }}-1) trixiel; urgency=low
+          pg-z (${PKG_VERSION}-1) trixiel; urgency=low
 
-            * Automated build from git tag ${{ needs.init.outputs.git_tag }}.
+            * Automated build from git tag ${GIT_TAG}.
 
-           -- AI Packer <pack@example.com>  ${{ needs.init.outputs.deb_date }}
+           -- AI Packer <pack@example.com>  ${DEB_DATE}
           EOF
 
           cat << 'EOF' > debian/control
@@ -125,6 +126,7 @@ jobs:
   # Building .RPM package (Rocky Linux / RHEL 9)
   # ==============================================================================
   build-rpm:
+    needs: init
     runs-on: ubuntu-latest
     container: rockylinux:9
     env:
