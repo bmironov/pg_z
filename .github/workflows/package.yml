@@ -306,6 +306,7 @@ jobs:
   # PUBLISH TO GITHUB RELEASES
   # ==============================================================================
   create-release:
+    if: false
     needs: [build-deb, build-rpm]
     runs-on: ubuntu-latest
     permissions:
