@@ -104,6 +104,8 @@ jobs:
 
           cat << 'EOF' > debian/rules
           #!/usr/bin/make -f
+          export DEB_CFLAGS_MAINT_APPEND = -I/opt/zlib-ng/include -I/usr/include
+          export DEB_LDFLAGS_MAINT_APPEND = -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib
           %:
           	dh $@
           override_dh_auto_configure:
