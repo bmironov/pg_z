@@ -74,11 +74,10 @@ jobs:
           cmake --install .
 
       - name: Build Debian Package
-        env:
-          C_INCLUDE_PATH: /opt/zlib-ng/include
-          CPATH: /opt/zlib-ng/include
-          LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
         run: |
+          export C_INCLUDE_PATH="${C_INCLUDE_PATH:+$C_INCLUDE_PATH:}/opt/zlib-ng/include"
+          export CPATH="${CPATH:+$CPATH:}/opt/zlib-ng/include"
+          export LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}/opt/zlib-ng/lib64:/opt/zlib-ng/lib"
           mkdir -p debian
           cat << EOF > debian/changelog
           pg-z (${PKG_VERSION}-1) trixiel; urgency=low
