@@ -13,10 +13,10 @@ jobs:
   init:
     runs-on: ubuntu-latest
     outputs:
-      git_tag: ${{ steps:vars.outputs.GIT_TAG }}
-      pkg_version: ${{ steps:vars.outputs.PKG_VERSION }}
-      deb_date: ${{ steps:vars.outputs.DEB_DATE }}
-      rpm_date: ${{ steps:vars.outputs.RPM_DATE }}
+      git_tag: ${{ steps.vars.outputs.GIT_TAG }}
+      pkg_version: ${{ steps.vars.outputs.PKG_VERSION }}
+      deb_date: ${{ steps.vars.outputs.DEB_DATE }}
+      rpm_date: ${{ steps.vars.outputs.RPM_DATE }}
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v5
