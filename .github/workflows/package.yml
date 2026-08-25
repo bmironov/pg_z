@@ -88,15 +88,18 @@ jobs:
           cmake --build . --parallel $(nproc)
           cmake --install .
 
+          echo "DEB_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+
       - name: Prepare Dynamic Configuration Flags
         run: |
           EXTRA_FLAGS=""
           if [ "${MATRIX_DEBIAN}" = "bookworm" ]; then
             EXTRA_FLAGS="--with-link-zstd=dynamic --with-link-lz4=dynamic"
           fi
-          
-          # Save henerated flags to use in next step
           echo "CONFIGURE_EXTRA_FLAGS=${EXTRA_FLAGS}" >> $GITHUB_ENV
+          echo "DEB_CFLAGS=${DEB_CFLAGS} -I/usr/include" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=${DEB_LDFLAGS} -L/usr/lib/x86_64-linux-gnu -L/usr/lib" >> $GITHUB_ENV
           
       - name: Build Debian Package
         env:
@@ -144,12 +147,14 @@ jobs:
           	dh \$@
           override_dh_auto_configure:
           	autoreconf -ifv --install
-          	./configure --prefix=/usr ${CONFIGURE_EXTRA_FLAGS} \
-          	  CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
-          	  LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib -pthread" \
-              LIBS="-lpthread -lm"
+            ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+          	  CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
+          	  LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
+          	  LIBS="-lpthread -lm"
+
           override_dh_auto_build:
           	make
+
           override_dh_auto_install:
           	make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
           EOF_R
@@ -227,14 +232,17 @@ jobs:
           cmake --build . --parallel $(nproc)
           cmake --install .
 
+          echo "RPM_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
+          echo "RPM_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+
       - name: Prepare Dynamic Configuration Flags for RPM
         run: |
           # Grant workspace visibility access permissions under root container environment
           git config --global --add safe.directory '*'
-          
-          EXTRA_FLAGS=""
-          # Placeholder hook block for target enterprise release tweaks if needed
-          echo "CONFIGURE_EXTRA_FLAGS=${EXTRA_FLAGS}" >> $GITHUB_ENV
+
+          echo "CONFIGURE_EXTRA_FLAGS=--with-link-brotli=dynamic --with-link-lz4=dynamic --with-link-zstd=dynamic --with-link-snappy=dynamic" >> $GITHUB_EN
+          echo "RPM_CFLAGS=${RPM_CFLAGS} -I/usr/include" >> $GITHUB_ENV
+          echo "RPM_LDFLAGS=${RPM_LDFLAGS} -L/usr/lib64 -L/usr/lib" >> $GITHUB_ENV
 
       - name: Build RPM Package
         run: |
@@ -275,12 +283,12 @@ jobs:
           %setup -q -n pg_z-${PKG_VERSION}
           
           %build
-          autoreconf -ivf --install
-         
-          # Forward standard libraries linking markers directly as script parameters arguments configurations entries
-          ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${CONFIGURE_EXTRA_FLAGS} \
-            CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
-            LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -pthread" \
+          autoreconf -if
+          automake --add-missing --copy 2>/dev/null || true
+
+          ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+            CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
+            LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
             LIBS="-lpthread -lm"
           make %{?_smp_mflags}
           
