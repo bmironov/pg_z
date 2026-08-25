@@ -80,7 +80,7 @@ include $(PGXS)
 
 all: format-extension-output
 
-format-extension-output:
+format-extension-output: $(shlib)
 ifndef DEBUG_BUILD
 	@echo "=== Stripping out debug info from .so ==="
 	@$(STRIP_CMD)
