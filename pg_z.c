@@ -157,6 +157,7 @@ pg_z_version(PG_FUNCTION_ARGS)
 #endif
 
 	appendStringInfo(&buf, ")");
+	first = !first; // just to silence compiler in edge case
 
 	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
