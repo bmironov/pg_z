@@ -167,95 +167,140 @@ jobs:
           path: "*.deb"
 
   # ==============================================================================
-  # Building .RPM package (Rocky Linux / RHEL 9)
+  # Building .RPM package (Rocky Linux 8 / 9) and Postgres 16, 17, 18
   # ==============================================================================
   build-rpm:
     needs: init
     runs-on: ubuntu-latest
-    container: rockylinux:9
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        rocky_version: ["8", "9"]       # Supports Rocky Linux 8 and 9
+        pg_version: ["16", "17", "18"]  # Target PostgreSQL major versions
+
+    container: rockylinux:${{ matrix.rocky_version }}
     env:
       GIT_TAG: ${{ needs.init.outputs.git_tag }}
       PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
       RPM_DATE: ${{ needs.init.outputs.rpm_date }}
+      MATRIX_ROCKY: ${{ matrix.rocky_version }}
+      MATRIX_PG: ${{ matrix.pg_version }}
+
     steps:
       - name: Install Git and Basics in Container
         run: dnf install -y git wget shadow-utils
 
       - name: Checkout Source Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install PGDG Repository and Toolchain
         run: |
           dnf install -y epel-release
-          dnf config-manager --set-enabled crb
-
-          # Install the exact PGDG YUM repository RPM package for EL9 architectures
-          dnf install -y https://download.postgresql.org/pub/repos/yum/common/redhat/rhel-9-x86_64/pgdg-redhat-repo-42.0-66.rhel9.8PGDG.noarch.rpm
-
-          # Disable default built-in appstream postgresql modules to let PGDG packages take priority
-          dnf -qy module disable postgresql
-
-          # Install toolchain and extension development headers (now perl-IPC-Run will resolve perfectly)
-          dnf install -y --nogpgcheck postgresql18-devel gcc make autoconf automake cmake \
-            brotli-devel lz4-devel snappy-devel libzstd-devel zlib-devel rpm-build rpmdevtools
+          # CRB repository name differs between EL8 (PowerTools) and EL9 (crb)
+          dnf config-manager --set-enabled crb || dnf config-manager --set-enabled PowerTools
+          
+          # Fetch the universal rolling-release PGDG RPM repository layout configuration
+          dnf install -y https://postgresql.org{MATRIX_ROCKY}-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+          
+          # Disable OS-native appstream postgresql modules to prevent conflict packages
+          dnf -qy module disable postgresql || true
+          
+          # Install toolchain and extension development headers alongside glibc-static for autoconf tests
+          dnf install -y --nogpgcheck postgresql${MATRIX_PG}-devel gcc make autoconf automake cmake \
+            brotli-devel lz4-devel snappy-devel libzstd-devel zlib-devel rpm-build rpmdevtools glibc-static
 
       - name: Compile Static zlib-ng for RPM Build
         run: |
           cd /tmp
-          wget "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/{{ env.ZLIB_NG_VERSION }}.tar.gz"
-          tar -xzf "${{ env.ZLIB_NG_VERSION }}.tar.gz" && cd "zlib-ng-${{ env.ZLIB_NG_VERSION }}"
+          wget "https://github.com{ZLIB_NG_VERSION}.tar.gz"
+          tar -xzf "${ZLIB_NG_VERSION}.tar.gz" && cd "zlib-ng-${ZLIB_NG_VERSION}"
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng
           cmake --build . --parallel $(nproc)
           cmake --install .
 
-      - name: Build RPM Package
-        env:
-          C_INCLUDE_PATH: /opt/zlib-ng/include
-          CPATH: /opt/zlib-ng/include
-          LIBRARY_PATH: /opt/zlib-ng/lib64:/opt/zlib-ng/lib
+      - name: Prepare Dynamic Configuration Flags for RPM
         run: |
+          # Grant workspace visibility access permissions under root container environment
+          git config --global --add safe.directory '*'
+          
+          EXTRA_FLAGS=""
+          # Placeholder hook block for target enterprise release tweaks if needed
+          echo "CONFIGURE_EXTRA_FLAGS=${EXTRA_FLAGS}" >> $GITHUB_ENV
+
+      - name: Build RPM Package
+        run: |
+          # Safe path expansion variables for compiler environment targets
+          if [ -n "$C_INCLUDE_PATH" ]; then export C_INCLUDE_PATH="$C_INCLUDE_PATH:/opt/zlib-ng/include"; else export C_INCLUDE_PATH="/opt/zlib-ng/include"; fi
+          if [ -n "$CPATH" ]; then export CPATH="$CPATH:/opt/zlib-ng/include"; else export CPATH="/opt/zlib-ng/include"; fi
+          if [ -n "$LIBRARY_PATH" ]; then export LIBRARY_PATH="$LIBRARY_PATH:/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; else export LIBRARY_PATH="/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; fi
+
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "${PKG_VERSION}")
+          
+          # Set up standard RPM builder tree directories path structure
           rpmdev-setuptree
-          TAR_DIR="/tmp/pg_z-1.0"
+          TAR_DIR="/tmp/pg_z-${PKG_VERSION}"
           mkdir -p $TAR_DIR
           cp -r ./* $TAR_DIR/
-          cd /tmp && tar -czf ~/rpmbuild/SOURCES/pg_z-1.0.tar.gz pg_z-1.0 && cd -
+          cd /tmp && tar -czf ~/rpmbuild/SOURCES/pg_z-${PKG_VERSION}.tar.gz pg_z-${PKG_VERSION} && cd -
 
-          cat << 'EOF' > pg_z.spec
-          Name:           postgresql18-pg_z
-          Version:        1.0
-          Release:        1%{?dist}
-          Summary:        Modern compression algorithms for PostgreSQL 18
+          # Generate valid .spec deployment manifest descriptor file context properties
+          cat << EOF > pg_z.spec
+          Name:           postgresql${MATRIX_PG}-pg_z
+          Version:        ${PKG_VERSION}
+          Release:        1.el${MATRIX_ROCKY}%{?dist}
+          Summary:        Modern compression algorithms for PostgreSQL ${MATRIX_PG}
           License:        MIT
           URL:            https://github.com
-          Source0:        pg_z-1.0.tar.gz
-          BuildRequires:  gcc make autoconf automake postgresql18-devel
-          Requires:       postgresql18-server
+          Source0:        pg_z-${PKG_VERSION}.tar.gz
+          BuildRequires:  gcc make autoconf automake postgresql${MATRIX_PG}-devel glibc-static
+          Requires:       postgresql${MATRIX_PG}-server
+          
           %description
-          Modern compression algorithms for PostgreSQL 18 (Brotli, LZ4, Snappy, Zstd, static zlib-ng)
+          Modern compression algorithms for PostgreSQL ${MATRIX_PG} (Brotli, LZ4, Snappy, Zstd, static zlib-ng)
+          
           %prep
-          %setup -q -n pg_z-1.0
+          %setup -q -n pg_z-${PKG_VERSION}
+          
           %build
           autoreconf -if
-          ./configure PG_CONFIG=/usr/pgsql-18/bin/pg_config --with-link-gzip-ng=static
+          # Forward standard libraries linking markers directly as script parameters arguments configurations entries
+          ./configure PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config ${CONFIGURE_EXTRA_FLAGS} \
+            CFLAGS="-I/opt/zlib-ng/include -I/usr/include -pthread" \
+            LDFLAGS="-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -pthread" \
+            LIBS="-lpthread -lm"
           make %{?_smp_mflags}
+          
           %install
           rm -rf %{buildroot}
           make install DESTDIR=%{buildroot}
+          
           %files
-          /usr/pgsql-18/lib/pg_z.so
-          /usr/pgsql-18/share/extension/pg_z.control
-          /usr/pgsql-18/share/extension/pg_z--*.sql
-          /usr/pgsql-18/lib/bitcode/pg_z*
+          /usr/pgsql-${MATRIX_PG}/lib/pg_z.so
+          /usr/pgsql-${MATRIX_PG}/share/extension/pg_z.control
+          /usr/pgsql-${MATRIX_PG}/share/extension/pg_z--*.sql
+          /usr/pgsql-${MATRIX_PG}/lib/bitcode/pg_z*
+          
+          %changelog
+          * ${RPM_DATE} AI Packer <pack@example.com> - ${PKG_VERSION}-1
+          - Automated build from git tag ${VERSION_TAG}.
           EOF
 
+          # Run actual compilation task
           rpmbuild -ba pg_z.spec
+          
+          # Move output packages to localized subfolder path to prepare workspace targeting routing
+          mkdir -p rpm-packages
+          cp /root/rpmbuild/RPMS/x86_64/*.rpm ./rpm-packages/
 
       - name: Upload RPM Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: postgresql-18-pg-z-rpm
-          path: /root/rpmbuild/RPMS/x86_64/*.rpm
+          name: pg${{ matrix.pg_version }}-pg-z-rocky${{ matrix.rocky_version }}-${{ runner.arch }}-rpm
+          path: "rpm-packages/*.rpm"
 
   # ==============================================================================
   # PUBLISH TO GITHUB RELEASES
