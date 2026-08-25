@@ -26,7 +26,7 @@ jobs:
         id: vars
         run: |
           GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
-          PKG_VERSION=$$(echo $GIT_TAG)
+          PKG_VERSION=$(echo $GIT_TAG)
           
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_OUTPUT
           echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
