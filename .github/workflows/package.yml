@@ -118,7 +118,7 @@ jobs:
           export DEB_LDFLAGS_MAINT_APPEND = -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib
 
           %:
-          	dh $@
+          	dh \$@
           override_dh_auto_configure:
           	autoreconf -if
           	./configure --prefix=/usr \
