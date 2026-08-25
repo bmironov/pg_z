@@ -113,7 +113,6 @@ jobs:
           	make install DESTDIR=$(CURDIR)/debian/postgresql-18-pg-z
           EOF
           chmod +x debian/rules
-          echo "13" > debian/compat
           dpkg-buildpackage -us -uc -b
 
       - name: Upload DEB Artifact
