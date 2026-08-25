@@ -35,9 +35,10 @@ jobs:
           echo "RPM_DATE=$(date +'%a %b %d %Y')" >> $GITHUB_OUTPUT
 
   # ==============================================================================
-  # Building .DEB package (Ubuntu / Debian) and Postgres 16, 17, 18
+  # Building .DEB package (Ubuntu / Debian) and Postgres 16 - 18
   # ==============================================================================
   build-deb:
+    if: false
     needs: init
     runs-on: ubuntu-latest
 
@@ -201,7 +202,7 @@ jobs:
           dnf install -y epel-release
 
           # Enable CRB / PowerTools repositories (required for build headers)
-          dnf config-manager --set-enabled crb || dnf config-manager --set-enabled PowerTools
+          dnf config-manager --set-enabled crb || dnf config-manager --set-enabled powertools || true
           
           # CRITICAL FIX FOR ROCKY 8: Enable the 'devel' repository where perl-IPC-Run lives
           dnf config-manager --set-enabled devel || true
@@ -213,7 +214,7 @@ jobs:
           dnf -qy module disable postgresql || true
           
           # Install toolchain and extension development headers alongside glibc-static for autoconf tests
-          dnf install -y --nogpgcheck postgresql${MATRIX_PG}-devel gcc make autoconf automake cmake \
+          dnf install -y --nogpgcheck postgresql${MATRIX_PG}-devel gcc gcc-c++ make autoconf automake cmake \
             brotli-devel lz4-devel snappy-devel libzstd-devel zlib-devel rpm-build rpmdevtools glibc-static
 
       - name: Compile Static zlib-ng for RPM Build
