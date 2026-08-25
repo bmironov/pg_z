@@ -35,16 +35,26 @@ jobs:
           echo "RPM_DATE=$(date +'%a %b %d %Y')" >> $GITHUB_OUTPUT
 
   # ==============================================================================
-  # Building .DEB package (Ubuntu / Debian)
+  # Building .DEB package (Ubuntu / Debian) and Postgres 16, 17, 18
   # ==============================================================================
   build-deb:
     needs: init
     runs-on: ubuntu-latest
-    container: debian:trixie
+
+    strategy:
+      fail-fast: false # Failure in one build doesn't fail others
+      matrix:
+        debian_version: ["bookworm", "trixie"] # Debian 12 and 13
+        pg_version: ["16", "17", "18"]         # PostgreSQL versions
+
+    container: debian:${{ matrix.debian_version }}
     env:
       GIT_TAG: ${{ needs.init.outputs.git_tag }}
       PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
       DEB_DATE: ${{ needs.init.outputs.deb_date }}
+      MATRIX_DEBIAN: ${{ matrix.debian_version }}
+      MATRIX_PG: ${{ matrix.pg_version }}
+
     steps:
       - name: Install Core Version Control Tools
         run: |
@@ -56,15 +66,15 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Install Official PGDG Repository and PostgreSQL 18 Header Toolchains
+      - name: Install Official PGDG Repository and PostgreSQL Header Toolchains
         run: |
           apt install -y postgresql-common
           echo | /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
           # Refresh package indexing matrices using the newly registered secure channel mirrors
           apt-get update
           apt-get install -y --reinstall libc6-dev
-          # Install debian package compiler targets alongside PostgreSQL 18 backend server development tools
-          apt-get install -y git devscripts debhelper postgresql-server-dev-18 \
+          # Install debian package compiler targets alongside PostgreSQL ${MATRIX_PG} backend server development tools
+          apt-get install -y git devscripts debhelper postgresql-server-dev-${MATRIX_PG} \
             libbrotli-dev zlib1g-dev liblz4-dev libsnappy-dev libzstd-dev cmake build-essential autoconf automake
 
       - name: Compile Static zlib-ng for DEB Build
@@ -92,7 +102,7 @@ jobs:
           echo "Current code version based on Git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.1')"
           mkdir -p debian
           cat << EOF > debian/changelog
-          pg-z (${PKG_VERSION}-1) trixie; urgency=low
+          pg-z (${PKG_VERSION}-1) ${MATRIX_DEBIAN}; urgency=low
 
             * Automated build from git tag ${GIT_TAG}.
 
@@ -104,13 +114,13 @@ jobs:
           Section: database
           Priority: optional
           Maintainer: AI Packer <pack@example.com>
-          Build-Depends: debhelper-compat (= 13), postgresql-server-dev-18, autoconf, automake
+          Build-Depends: debhelper-compat (= 13), postgresql-server-dev-${MATRIX_PG}, autoconf, automake
           Standards-Version: 4.6.0
 
-          Package: postgresql-18-pg-z
+          Package: postgresql-${MATRIX_PG}-pg-z
           Architecture: any
-          Depends: \${shlibs:Depends}, \${misc:Depends}, postgresql-18
-          Description: Collection of userspace functions providing access to compression algorithms inside PostgreSQL 18
+          Depends: \${shlibs:Depends}, \${misc:Depends}, postgresql-${MATRIX_PG}
+          Description: Collection of userspace functions providing access to compression algorithms inside PostgreSQL ${MATRIX_PG}
           EOF
 
           cat << EOF_R > debian/rules
@@ -130,20 +140,20 @@ jobs:
           override_dh_auto_build:
           	make
           override_dh_auto_install:
-          	make install DESTDIR=\$(CURDIR)/debian/postgresql-18-pg-z
+          	make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
           EOF_R
           chmod +x debian/rules
           dpkg-buildpackage -us -uc -b
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
-          DEB_ARCH=$(dpkg --print-architecture)
-          mv ../postgresql-18-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-18-pg-z_${PKG_VERSION}-1.trixie_${DEB_ARCH}.deb
+          DEB_ARCH=\$(dpkg --print-architecture)
+          mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_\${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1.\${MATRIX_DEBIAN}_\${DEB_ARCH}.deb
           mv ../*.deb ./
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: postgresql-18-pg-z-deb
+          name: pg${{ matrix.pg_version }}-pg-z-${{ matrix.debian_version }}-${{ runner.arch }}-deb
           path: "*.deb"
 
   # ==============================================================================
