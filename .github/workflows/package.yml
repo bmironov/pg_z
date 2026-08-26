@@ -90,10 +90,14 @@ jobs:
           cmake --install .
 
           echo "DEB_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
-          echo "DEB_LDFLAGS=${{ env.DEB_LDFLAGS }} -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=${{ env.DEB_LDFLAGS }}" >> $GITHUB_ENV
           ZNG_LIB="/opt/zlib-ng/lib64/libz-ng.a"
-          [ ! -f "$ZNG_LIB" ] && ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
-          echo "DEB_LIBS=$ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
+          ZNG_LIBS="-L/opt/zlib-ng/lib64"
+          if [ ! -f "$ZNG_LIB" ]; then
+            ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
+            ZNG_LIBS="-L/opt/zlib-ng/lib"
+          fi
+          echo "DEB_LIBS=$ZNG_LIBS $ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags
         run: |
