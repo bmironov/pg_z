@@ -142,21 +142,22 @@ jobs:
 
           cat << EOF_R > debian/rules
           #!/usr/bin/make -f
-					%:
-						dh \$@
-					override_dh_auto_configure:
-						autoreconf -ifv --install
-						./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
-							CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
-							LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
-							LIBS="%{{ env.DEB_LIBS }} -lpthread -lm"
+          %:
+            dh \$@
 
-					override_dh_auto_build:
-						make
+          override_dh_auto_configure:
+            autoreconf -ifv --install
+            ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+              CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
+              LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
+              LIBS="%{{ env.DEB_LIBS }} -lpthread -lm"
 
-					override_dh_auto_install:
-					make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
-					EOF_R
+          override_dh_auto_build:
+            make
+
+          override_dh_auto_install:
+            make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
+          EOF_R
           chmod +x debian/rules
           dpkg-buildpackage -us -uc -b
 
