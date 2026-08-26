@@ -142,25 +142,21 @@ jobs:
 
           cat << EOF_R > debian/rules
           #!/usr/bin/make -f
-          export GIT_VERSION = ${PKG_VERSION}
-          export DEB_CFLAGS_MAINT_APPEND = -I/opt/zlib-ng/include -I/usr/include
-          export DEB_LDFLAGS_MAINT_APPEND = -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib
+					%:
+						dh \$@
+					override_dh_auto_configure:
+						autoreconf -ifv --install
+						./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+							CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
+							LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
+							LIBS="%{{ env.DEB_LIBS }} -lpthread -lm"
 
-          %:
-          	dh \$@
-          override_dh_auto_configure:
-          	autoreconf -ifv --install
-            ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
-          	  CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
-          	  LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
-          	  LIBS="%{{ env.DEB_LIBS }} -lpthread -lm"
+					override_dh_auto_build:
+						make
 
-          override_dh_auto_build:
-          	make
-
-          override_dh_auto_install:
-          	make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
-          EOF_R
+					override_dh_auto_install:
+					make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
+					EOF_R
           chmod +x debian/rules
           dpkg-buildpackage -us -uc -b
 
@@ -303,7 +299,7 @@ jobs:
           ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
-            LIBS="${{ env.RPM_LIBS}} -lpthread -lm"
+            LIBS="${{ env.RPM_LIBS}} -L/usr/lib64 -L/usr/lib -lpthread -lm"
           make PG_CONFIG=%{pg_config_path}
           
           %install
