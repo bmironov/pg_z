@@ -113,8 +113,10 @@ jobs:
           DEB_DATE: ${{ needs.init.outputs.deb_date }}
         run: |
           git config --global --add safe.directory '*'
+          echo "${PKG_VERSION}" > VERSION
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
+          echo "Real Git Version identified as: ${VERSION_TAG}"
 
-          echo "Current code version based on Git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.1')"
           mkdir -p debian
           cat << EOF > debian/changelog
           pg-z (${PKG_VERSION}-1) ${MATRIX_DEBIAN}; urgency=low
@@ -242,7 +244,7 @@ jobs:
         run: |
           # Grant workspace visibility access permissions under root container environment
           git config --global --add safe.directory '*'
-
+          
           echo "RPM_PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config" >> $GITHUB_ENV
           echo "PATH=/usr/pgsql-${MATRIX_PG}/bin:$PATH" >> $GITHUB_ENV
           
@@ -256,16 +258,16 @@ jobs:
           
       - name: Build RPM Package
         run: |
-          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "${PKG_VERSION}")
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
           echo "Real Git Version identified as: ${VERSION_TAG}"
+          echo "${VERSION_TAG}" > $TAR_DIR/VERSION
           
           # Set up standard RPM builder tree directories path structure
           rpmdev-setuptree
           TAR_DIR="/tmp/pg_z-${PKG_VERSION}"
           mkdir -p $TAR_DIR
           cp -r ./* $TAR_DIR/
-          echo "${VERSION_TAG}" > $TAR_DIR/VERSION
-
+          
           # Physically inject official system Autotools scripts into the tarball folder.
           # This bypasses Automake constraints and ensures absolute isolation compliance.
           cp /usr/share/automake-*/install-sh $TAR_DIR/ 2>/dev/null || true
