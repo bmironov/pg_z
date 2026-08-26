@@ -384,13 +384,17 @@ jobs:
           cd ${WORKSPACE_DIR}
           echo "Archive files successfully generated inside workspace location."
 
-      - name: Upload Source Archives Artifact
+      - name: Upload TAR.GZ Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pg_z-${{ needs.init.outputs.pkg_version }}-generic-archives
-          path: |
-            *.tar.gz
-            *.zip
+          name: pg_z-${{ needs.init.outputs.pkg_version }}-source-targz
+          path: "pg_z-*.tar.gz"
+
+      - name: Upload ZIP Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pg_z-${{ needs.init.outputs.pkg_version }}-source-zip
+          path: "pg_z-*.zip"
 
   # ==============================================================================
   # PUBLISH TO GITHUB RELEASES
@@ -418,7 +422,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
-          pattern: pg_z*-archives
+          pattern: "pg_z*-source-*"
           merge-multiple: true
           
       - name: Create GitHub Release and Upload Assets
