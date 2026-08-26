@@ -249,6 +249,7 @@ jobs:
           echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
 
           echo "RPM_CFLAGS=-I/usr/include ${{ env.RPM_CFLAGS }}" >> $GITHUB_ENV
+          echo "RPM_LDFLAGS=${{ env.RPM_LDFLAGS }} -L/usr/lib64 -L/usr/lib -pthread" >> $GITHUB_ENV
           
       - name: Build RPM Package
         run: |
@@ -299,13 +300,15 @@ jobs:
             LIBS="${{ env.RPM_LIBS}} -lpthread -lm"
           make \
             PG_CONFIG="${{ env.RPM_PG_CONFIG }}" \
-            PG_CFLAGS="${{ env.RPM_CFLAGS }}"
+            PG_CFLAGS="${{ env.RPM_CFLAGS }}" \
+            PG_LDFLAGS="${{ env.RPM_LDFLAGS }}"
 
           %install
           rm -rf %{buildroot}
           make install DESTDIR=%{buildroot} \
             PG_CONFIG="${{ env.RPM_PG_CONFIG }}" \
-            PG_CFLAGS="${{ env.RPM_CFLAGS }}"
+            PG_CFLAGS="${{ env.RPM_CFLAGS }}" \
+            PG_LDFLAGS="${{ env.RPM_LDFLAGS }}"
           
           %files
           /usr/pgsql-${MATRIX_PG}/lib/pg_z.so
