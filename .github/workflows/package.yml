@@ -38,7 +38,7 @@ jobs:
   # Building .DEB package (Ubuntu / Debian) and Postgres 16 - 18
   # ==============================================================================
   build-deb:
-    if: true
+    if: false
     needs: init
     runs-on: ubuntu-latest
 
@@ -247,7 +247,8 @@ jobs:
           LIBS_LINKING="$LIBS_LINKING --with-link-zstd=dynamic --with-link-snappy=dynamic"
           echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
 
-          echo "RPM_CFLAGS=${RPM_CFLAGS} -I/usr/include" >> $GITHUB_ENV
+          echo "RPM_CFLAGS=-I/usr/include ${RPM_CFLAGS}" >> $GITHUB_ENV
+          echo "RPM_LDFLAGS=-L/usr/lib64 -L/usr/lib ${RPM_LDFLAGS}" >> $GITHUB_ENV
           
       - name: Build RPM Package
         run: |
@@ -295,7 +296,7 @@ jobs:
           ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
-            LIBS="${{ env.RPM_LIBS}} -L/usr/lib64 -L/usr/lib -lpthread -lm"
+            LIBS="${{ env.RPM_LIBS}} -lpthread -lm"
           make PG_CONFIG=%{pg_config_path}
           
           %install
