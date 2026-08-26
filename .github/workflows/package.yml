@@ -277,6 +277,9 @@ jobs:
 
           # Generate valid .spec deployment manifest descriptor file context properties
           cat << EOF > pg_z.spec
+
+          # This blocks the 'Empty %files file debugsourcefiles.list' abort failure!
+          %undefine _debugsource_packages
           
           Name:           postgresql${MATRIX_PG}-pg_z
           Version:        ${PKG_VERSION}
