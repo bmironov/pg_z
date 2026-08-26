@@ -88,8 +88,6 @@ AS_IF([test "x$is_debian" = "xyes"], [
 ])
 
 
-SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
-
 # Variables to accumulate verified runtime libraries
 STATIC_LIBS=""
 DYNAMIC_LIBS=""
@@ -111,9 +109,6 @@ AC_DEFUN([MY_CHECK_LIB], [
     LIBS="-l$3 $LIBS"
 
     AS_IF([test "$MODE" = "static"], [
-        save_LDFLAGS="$LDFLAGS"
-        LDFLAGS="$LDFLAGS -static"
-
         AC_CHECK_LIB([$3], [$4], [
             AS_VAR_APPEND([STATIC_LIBS], [" -l$3"])
             AS_VAR_SET([HAVE_$1], [yes])
