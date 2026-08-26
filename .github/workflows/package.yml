@@ -334,7 +334,7 @@ jobs:
           
           # Move output packages to localized subfolder path to prepare workspace targeting routing
           mkdir -p rpm-packages
-          cp /root/rpmbuild/RPMS/x86_64/*.rpm ./rpm-packages/
+          cp /github/home/rpmbuild/RPMS/x86_64/*.rpm ./rpm-packages/
 
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v7
