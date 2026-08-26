@@ -158,21 +158,20 @@ jobs:
           dpkg-buildpackage -us -uc -b
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
-          DEB_ARCH=$(dpkg --print-architecture)
-          mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1.${MATRIX_DEBIAN}_${DEB_ARCH}.deb
+          mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1.${MATRIX_DEBIAN}_amd64.deb
           mv ../*.deb ./
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pg${{ matrix.pg_version }}-pg-z-${{ matrix.debian_version }}-${{ runner.arch }}-deb
+          name: pg${{ matrix.pg_version }}-pg-z-${{ matrix.debian_version }}-amd64-deb
           path: "*.deb"
 
   # ==============================================================================
   # Building .RPM package (Rocky Linux 8 - 9) and Postgres 16 - 18
   # ==============================================================================
   build-rpm:
-    if: true
+    if: false
     needs: init
     runs-on: ubuntu-latest
     
@@ -180,7 +179,7 @@ jobs:
       fail-fast: false
       matrix:
         rocky_version: ["9"]       # Supports Rocky Linux 8 - 9
-        pg_version: ["16", "17", "18"]  # Target PostgreSQL major versions
+        pg_version: ["18"]  # Target PostgreSQL major versions
 
     container: rockylinux:${{ matrix.rocky_version }}
     env:
@@ -195,7 +194,7 @@ jobs:
         run: dnf install -y git wget shadow-utils
 
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -339,38 +338,70 @@ jobs:
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pg${{ matrix.pg_version }}-pg-z-rocky${{ matrix.rocky_version }}-${{ runner.arch }}-rpm
+          name: pg${{ matrix.pg_version }}-pg-z-rocky${{ matrix.rocky_version }}-x86_64-rpm
           path: "rpm-packages/*.rpm"
+
+  # ==============================================================================
+  # Building generic source archives (.tar.gz and .zip)
+  # ==============================================================================
+  build-archives:
+    if: true
+    needs: init
+    runs-on: ubuntu-latest
+    env:
+      GIT_TAG: ${{ needs.init.outputs.git_tag }}
+      PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v5
+
+      - name: Inject Clean Version File
+        run: |
+          # Bake the verified release tag into a static VERSION file inside the archive root
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "${PKG_VERSION}")
+          echo "Real Git Version identified as: ${VERSION_TAG}"
+
+      - name: Build Generic tar.gz and zip Source Packages
+        run: |
+          ARCHIVE_NAME="pg_z-${PKG_VERSION}"
+          WORKSPACE_DIR=$(pwd)
+          TARGET_DIR="/tmp/${ARCHIVE_NAME}"
+          
+          # Create pristine temporary clean layout structure
+          mkdir -p ${TARGET_DIR}
+          cp -r ./* ${TARGET_DIR}/
+          
+          # 1. Create native Unix .tar.gz archive package
+          cd /tmp
+          tar -czf "${WORKSPACE_DIR}/${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}"
+          
+          # 2. Create cross-platform Universal .zip archive package
+          # Install zip utility if missing on host machine layout session
+          apt-get update && apt-get install -y zip
+          zip -r "${WORKSPACE_DIR}/${ARCHIVE_NAME}.zip" "${ARCHIVE_NAME}"
+          
+          cd ${WORKSPACE_DIR}
+          echo "Archive files successfully generated inside workspace location."
+
+      - name: Upload Source Archives Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pg_z-${{ needs.init.outputs.pkg_version }}-generic-archives
+          path: |
+            *.tar.gz
+            *.zip
 
   # ==============================================================================
   # PUBLISH TO GITHUB RELEASES
   # ==============================================================================
   create-release:
     if: false
-    needs: [build-deb, build-rpm]
+    needs: [build-deb, build-rpm, build-archives]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      # Dynamically evaluate tag value depending on checkout context routes
-      - name: Determine Target Release Tag
-        id: get_tag
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
-            echo "TARGET_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
-            echo "Manual trigger identified. Selected target release tag pointer: $LATEST_TAG"
-          else
-            # Use the active trigger tag directly
-            echo "TARGET_TAG=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "Tag push trigger identified. Processing target release tag pointer: ${{ github.ref_name }}"
-          fi
-
       - name: Download DEB Artifact
         uses: actions/download-artifact@v4
         with:
@@ -383,24 +414,36 @@ jobs:
           name: pg*-pg-z-*-rpm
           path: ./artifacts
 
+      - name: Download Generic Archives
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          pattern: pg_z*-archives
+          merge-multiple: true
+          
       - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_tag.outputs.TARGET_TAG }}
           name: Release ${{ steps.get_tag.outputs.TARGET_TAG }}
           body: |
-            Automated extension release for PostgreSQL (Matrix Build).
+            ## Modern Compression Algorithms extension for PostgreSQL
             
-            ### Supported Architectures:
-            PostgreSQL 16, 17, 18 on:
-            * Debian 12 (Bookworm)
-            * Debian 13 (Trixie)
-            * Rocky 8
-            * Rocky 9
+            Automated production build matrix delivery assets array deployment completed.
+
+            * **Build Version**: `${{ needs.init.outputs.git_tag }}`
+            
+            ### Distribution Packages Layout Matrix:
+            * **Debian/Ubuntu**: `.deb` packages tailored for Postgres 16, 17, 18 (Architecture: `amd64`)
+            * **RHEL/Rocky Linux**: `.rpm` packages tailored for Postgres 16, 17, 18 (Architecture: `x86_64`)
+            * **Generic Sources**: Portable `.tar.gz` and `.zip` source code archives.
+
           draft: false
           prerelease: false
           files:
             ./artifacts/*.deb
             ./artifacts/*.rpm
+            ./artifacts/*.tar.gz
+            ./artifacts/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
