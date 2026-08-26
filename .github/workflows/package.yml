@@ -157,11 +157,14 @@ jobs:
             LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread" \
             LIBS="${{ env.DEB_LIBS }} -lpthread -lm"
 
-          make PG_CFLAGS="${{ env.DEB_CFLAGS }}"
+          make \
+            PG_CFLAGS="${{ env.DEB_CFLAGS }}" \
+            PG_LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread"
           TARGET_STAGE_DIR="$(pwd)/debian/postgresql-${MATRIX_PG}-pg-z"
           mkdir -p "$TARGET_STAGE_DIR"  
           make install DESTDIR="$TARGET_STAGE_DIR" \
-            PG_CFLAGS="${{ env.DEB_CFLAGS }}"
+            PG_CFLAGS="${{ env.DEB_CFLAGS }}" \
+            PG_LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread"
 
           dpkg-buildpackage -us -uc -b
           DEB_ARCH=$(dpkg --print-architecture)
