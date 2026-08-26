@@ -159,6 +159,7 @@ jobs:
           make install DESTDIR="$TARGET_STAGE_DIR"
 
           dpkg-buildpackage -us -uc -b
+          DEB_ARCH=$(dpkg --print-architecture)
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
           mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1.${MATRIX_DEBIAN}_amd64.deb
