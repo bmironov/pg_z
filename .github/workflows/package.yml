@@ -140,28 +140,21 @@ jobs:
 
           cat << 'EOF_R' > debian/rules
           #!/usr/bin/make -f
-          %:
-            dh $@
-
-          override_dh_auto_configure:
-            autoreconf -ifv --install
-            ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
-              CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
-              LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
-              LIBS="${{ env.DEB_LIBS }} -lpthread -lm"
-
-          override_dh_auto_build:
-            make
-
-          override_dh_auto_install:
-            make install DESTDIR=\$(CURDIR)/debian/postgresql-${MATRIX_PG}-pg-z
+          %:; dh $@
           EOF_R
 
           chmod +x debian/rules
 
-          echo "=== DEBUG: Displaying rules file with visibility flags (Tabs as ^I, Ends as \$) ==="
-          cat -A debian/rules || cat -v debian/rules
-          echo "========================================================================="
+          autoreconf -ifv --install
+          ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
+            CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
+            LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
+            LIBS="${{ env.DEB_LIBS }} -lpthread -lm"
+
+          make
+          TARGET_STAGE_DIR="$(pwd)/debian/postgresql-${MATRIX_PG}-pg-z"
+          mkdir -p "$TARGET_STAGE_DIR"  
+          make install DESTDIR="$TARGET_STAGE_DIR"
 
           dpkg-buildpackage -us -uc -b
 
