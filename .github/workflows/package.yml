@@ -38,7 +38,7 @@ jobs:
   # Building .DEB package (Ubuntu / Debian) and Postgres 16 - 18
   # ==============================================================================
   build-deb:
-    if: false
+    if: true
     needs: init
     runs-on: ubuntu-latest
 
@@ -76,7 +76,8 @@ jobs:
           apt-get install -y --reinstall libc6-dev
           # Install debian package compiler targets alongside PostgreSQL ${MATRIX_PG} backend server development tools
           apt-get install -y git devscripts debhelper postgresql-server-dev-${MATRIX_PG} \
-            libbrotli-dev zlib1g-dev liblz4-dev libsnappy-dev libzstd-dev cmake build-essential autoconf automake
+            cmake build-essential autoconf automake \
+            libbrotli-dev zlib1g-dev liblz4-dev libsnappy-dev libzstd-dev
 
       - name: Compile Static zlib-ng for DEB Build
         run: |
@@ -92,7 +93,7 @@ jobs:
           echo "DEB_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
           ZNG_LIB="/opt/zlib-ng/lib64/libz-ng.a"
           [ ! -f "$ZNG_LIB" ] && ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
-          echo "DEB_LIBS=$ZNG_LIB" >> $GITHUB_ENV
+          echo "DEB_LIBS=$ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags
         run: |
@@ -100,9 +101,10 @@ jobs:
           if [ "${MATRIX_DEBIAN}" = "bookworm" ]; then
             EXTRA_FLAGS="--with-link-zstd=dynamic --with-link-lz4=dynamic"
           fi
+
           echo "CONFIGURE_EXTRA_FLAGS=${EXTRA_FLAGS}" >> $GITHUB_ENV
-          echo "DEB_CFLAGS=${DEB_CFLAGS} -I/usr/include" >> $GITHUB_ENV
-          echo "DEB_LDFLAGS=${DEB_LDFLAGS} -L/usr/lib/x86_64-linux-gnu -L/usr/lib" >> $GITHUB_ENV
+          echo "DEB_CFLAGS=${{ env.DEB_CFLAGS }} -I/usr/include" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=${{ env.DEB_LDFLAGS }} -L/usr/lib/x86_64-linux-gnu -L/usr/lib" >> $GITHUB_ENV
           
       - name: Build Debian Package
         env:
@@ -345,7 +347,7 @@ jobs:
   # Building generic source archives (.tar.gz and .zip)
   # ==============================================================================
   build-archives:
-    if: true
+    if: false
     needs: init
     runs-on: ubuntu-latest
     env:
