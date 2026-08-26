@@ -158,6 +158,11 @@ jobs:
           EOF_R
 
           chmod +x debian/rules
+
+          echo "=== DEBUG: Displaying rules file with visibility flags (Tabs as ^I, Ends as \$) ==="
+          cat -A debian/rules || cat -v debian/rules
+          echo "========================================================================="
+
           dpkg-buildpackage -us -uc -b
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
