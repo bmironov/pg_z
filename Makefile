@@ -1,3 +1,4 @@
+MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 ifneq ($(wildcard $(MAKEFILE_DIR)/.git),)
     GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null)
 else ifneq ($(wildcard $(MAKEFILE_DIR)/VERSION),)
