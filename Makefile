@@ -1,7 +1,7 @@
-ifneq ($(wildcard .git),)
+ifneq ($(wildcard $(MAKEFILE_DIR)/.git),)
     GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null)
-else ifneq ($(wildcard $(CURDIR)/VERSION),)
-    GIT_VERSION := $(shell cat $(CURDIR)/VERSION 2>/dev/null | tr -d '\n')
+else ifneq ($(wildcard $(MAKEFILE_DIR)/VERSION),)
+    GIT_VERSION := $(shell cat $(MAKEFILE_DIR)/VERSION 2>/dev/null | tr -d '\n')
 endif
 
 GIT_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),0.0.1)
