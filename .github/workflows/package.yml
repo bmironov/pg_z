@@ -90,7 +90,7 @@ jobs:
           cmake --install .
 
           echo "DEB_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
-          echo "DEB_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=${{ env.DEB_LDFLAGS }} -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
           ZNG_LIB="/opt/zlib-ng/lib64/libz-ng.a"
           [ ! -f "$ZNG_LIB" ] && ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
           echo "DEB_LIBS=$ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
@@ -104,7 +104,7 @@ jobs:
 
           echo "CONFIGURE_EXTRA_FLAGS=${EXTRA_FLAGS}" >> $GITHUB_ENV
           echo "DEB_CFLAGS=${{ env.DEB_CFLAGS }} -I/usr/include" >> $GITHUB_ENV
-          echo "DEB_LDFLAGS=${{ env.DEB_LDFLAGS }} -L/usr/lib/x86_64-linux-gnu -L/usr/lib" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=-L/usr/lib/x86_64-linux-gnu -L/usr/lib ${{ env.DEB_LDFLAGS }}" >> $GITHUB_ENV
           
       - name: Build Debian Package
         env:
@@ -149,8 +149,8 @@ jobs:
 
           autoreconf -ifv --install
           ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
-            CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
-            LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
+            CFLAGS="${{ env.DEB_CFLAGS }} -pthread" \
+            LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread" \
             LIBS="${{ env.DEB_LIBS }} -lpthread -lm"
 
           make
