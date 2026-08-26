@@ -185,7 +185,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rocky_version: ["8", "9"]       # Supports Rocky Linux 8 - 9
+        rocky_version: ["9"]       # Supports Rocky Linux 8 - 9
         pg_version: ["18"]  # Target PostgreSQL major versions
 
     container: rockylinux:${{ matrix.rocky_version }}
