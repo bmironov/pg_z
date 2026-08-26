@@ -90,6 +90,9 @@ jobs:
 
           echo "DEB_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
           echo "DEB_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+          ZNG_LIB="/opt/zlib-ng/lib64/libz-ng.a"
+          [ ! -f "$ZNG_LIB" ] && ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
+          echo "DEB_LIBS=$ZNG_LIB" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags
         run: |
@@ -150,7 +153,7 @@ jobs:
             ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
           	  CFLAGS="${{ env.DEB_CFLAGS }} -lpthread" \
           	  LDFLAGS="${{ env.DEB_LDFLAGS }} -lpthread" \
-          	  LIBS="-lpthread -lm"
+          	  LIBS="%{{ env.DEB_LIBS }} -lpthread -lm"
 
           override_dh_auto_build:
           	make
@@ -234,6 +237,9 @@ jobs:
 
           echo "RPM_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
           echo "RPM_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+          ZNG_LIB="/opt/zlib-ng/lib64/libz-ng.a"
+          [ ! -f "$ZNG_LIB" ] && ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
+          echo "RPM_LIBS=$ZNG_LIB" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags for RPM
         run: |
@@ -248,7 +254,7 @@ jobs:
           echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
 
           echo "RPM_CFLAGS=${RPM_CFLAGS} -I/usr/include" >> $GITHUB_ENV
-          echo "RPM_LDFLAGS=${RPM_LDFLAGS} -Wl,-Bstatic -lz-ng -Wl,-Bdynamic -L/usr/lib64 -L/usr/lib" >> $GITHUB_ENV
+          echo "RPM_LDFLAGS=${RPM_LDFLAGS} -L/usr/lib64 -L/usr/lib" >> $GITHUB_ENV
 
       - name: Build RPM Package
         run: |
@@ -293,11 +299,10 @@ jobs:
           
           %build
           autoconf
-          
           ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
-            LIBS="-lpthread -lm"
+            LIBS="${{ env.RPM_LIBS}} -lpthread -lm"
           make PG_CONFIG=%{pg_config_path}
           
           %install
