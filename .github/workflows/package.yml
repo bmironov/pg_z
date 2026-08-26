@@ -138,10 +138,10 @@ jobs:
           Description: Collection of userspace functions providing access to compression algorithms inside PostgreSQL ${MATRIX_PG}
           EOF
 
-          cat << EOF_R > debian/rules
+          cat << 'EOF_R' > debian/rules
           #!/usr/bin/make -f
           %:
-            dh \$@
+            dh $@
 
           override_dh_auto_configure:
             autoreconf -ifv --install
