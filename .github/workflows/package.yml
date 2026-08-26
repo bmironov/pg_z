@@ -98,7 +98,6 @@ jobs:
             ZNG_LIBS="-L/opt/zlib-ng/lib"
           fi
           echo "DEB_LIBS=$ZNG_LIBS $ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
-          echo "DEB_SHLIB_LINK=$ZNG_LIB ${{ env.DEB_SHLIB_LINK }}" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags
         run: |
@@ -107,7 +106,7 @@ jobs:
             EXTRA_FLAGS="--with-link-zstd=dynamic --with-link-lz4=dynamic"
           fi
           
-          echo "DEB_PG_CONFIG=/usr/pgsql-${MATRIX_PG}/bin/pg_config" >> $GITHUB_ENV
+          echo "DEB_PG_CONFIG=/usr/lib/postgresql/${MATRIX_PG}/bin/pg_config" >> $GITHUB_ENV
 
           echo "CONFIGURE_EXTRA_FLAGS=${EXTRA_FLAGS}" >> $GITHUB_ENV
           echo "DEB_CFLAGS=${{ env.DEB_CFLAGS }} -I/usr/include" >> $GITHUB_ENV
