@@ -98,7 +98,7 @@ jobs:
             ZNG_LIBS="-L/opt/zlib-ng/lib"
           fi
           echo "DEB_LIBS=$ZNG_LIBS $ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
-          echo "DEB_LDFLAGS=-L$ZNG_LIBS ${{ env.DEB_LDFLAGS }}" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=$ZNG_LIBS ${{ env.DEB_LDFLAGS }}" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags
         run: |
