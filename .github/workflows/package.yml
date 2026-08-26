@@ -304,7 +304,7 @@ jobs:
           make \
             PG_CONFIG="${{ env.RPM_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.RPM_CFLAGS }}" \
-            CLANG_FLAGS="${{ env.RPM_CFLAGS }}" \
+            BITCODE_CFLAGS="${{ env.RPM_CFLAGS }}" \
             PG_LDFLAGS="${{ env.RPM_PG_LDFLAGS }} -pthread"
 
           %install
@@ -312,7 +312,7 @@ jobs:
           make install DESTDIR=%{buildroot} \
             PG_CONFIG="${{ env.RPM_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.RPM_CFLAGS }}" \
-            CLANG_FLAGS="${{ env.RPM_CFLAGS }}" \
+            BITCODE_CFLAGS="${{ env.RPM_CFLAGS }}" \
             PG_LDFLAGS="${{ env.RPM_PG_LDFLAGS }} -pthread"
           
           %files
