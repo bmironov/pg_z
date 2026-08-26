@@ -38,15 +38,15 @@ jobs:
   # Building .DEB package (Ubuntu / Debian) and Postgres 16 - 18
   # ==============================================================================
   build-deb:
-    if: false
+    if: true
     needs: init
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false # Failure in one build doesn't fail others
       matrix:
-        debian_version: ["bookworm", "trixie"] # Debian 12 (bookworm), 13 (trixie)
-        pg_version: ["16", "17", "18"]         # PostgreSQL versions
+        debian_version: ["trixie"] # Debian 12 (bookworm), 13 (trixie)
+        pg_version: ["18"]         # PostgreSQL versions
 
     container: debian:${{ matrix.debian_version }}
     env:
@@ -179,6 +179,7 @@ jobs:
   # Building .RPM package (Rocky Linux 8 - 9) and Postgres 16 - 18
   # ==============================================================================
   build-rpm:
+    if: true
     needs: init
     runs-on: ubuntu-latest
     
