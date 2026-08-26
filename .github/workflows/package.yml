@@ -218,7 +218,8 @@ jobs:
           # Install toolchain and extension development headers alongside glibc-static for autoconf tests
           dnf install -y --nogpgcheck postgresql${MATRIX_PG}-devel \
             clang llvm llvm-devel gcc gcc-c++ make autoconf automake cmake \
-            brotli-devel lz4-devel snappy-devel libzstd-devel zlib-devel rpm-build rpmdevtools glibc-static
+            rpm-build rpmdevtools glibc-static \
+            brotli-devel lz4-devel snappy-devel libzstd-devel zlib-devel
 
       - name: Compile Static zlib-ng for RPM Build
         run: |
