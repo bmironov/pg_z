@@ -110,10 +110,6 @@ jobs:
           PKG_VERSION: ${{ needs.init.outputs.pkg_version }}
           DEB_DATE: ${{ needs.init.outputs.deb_date }}
         run: |
-          if [ -n "$C_INCLUDE_PATH" ]; then export C_INCLUDE_PATH="$C_INCLUDE_PATH:/opt/zlib-ng/include"; else export C_INCLUDE_PATH="/opt/zlib-ng/include"; fi
-          if [ -n "$CPATH" ]; then export CPATH="$CPATH:/opt/zlib-ng/include"; else export CPATH="/opt/zlib-ng/include"; fi
-          if [ -n "$LIBRARY_PATH" ]; then export LIBRARY_PATH="$LIBRARY_PATH:/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; else export LIBRARY_PATH="/opt/zlib-ng/lib64:/opt/zlib-ng/lib"; fi
-
           git config --global --add safe.directory '*'
 
           echo "Current code version based on Git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.1')"
@@ -233,8 +229,8 @@ jobs:
           cmake --build . --parallel $(nproc)
           cmake --install .
 
-          echo "RPM_CFLAGS=-I/opt/zlib-ng/include" >> $GITHUB_ENV
-          echo "RPM_LDFLAGS=-L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
+          echo "RPM_CFLAGS=${RPM_CFLAGS} -I/opt/zlib-ng/include" >> $GITHUB_ENV
+          echo "RPM_LDFLAGS=${RPM_LDFLAGS} -L/opt/zlib-ng/lib64 -L/opt/zlib-ng/lib" >> $GITHUB_ENV
           ZNG_LIB="/opt/zlib-ng/lib64/libz-ng.a"
           [ ! -f "$ZNG_LIB" ] && ZNG_LIB="/opt/zlib-ng/lib/libz-ng.a"
           echo "RPM_LIBS=$ZNG_LIB" >> $GITHUB_ENV
@@ -252,8 +248,7 @@ jobs:
           echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
 
           echo "RPM_CFLAGS=${RPM_CFLAGS} -I/usr/include" >> $GITHUB_ENV
-          echo "RPM_LDFLAGS=${RPM_LDFLAGS} -L/usr/lib64 -L/usr/lib" >> $GITHUB_ENV
-
+          
       - name: Build RPM Package
         run: |
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "${PKG_VERSION}")
@@ -381,8 +376,11 @@ jobs:
             Automated extension release for PostgreSQL (Matrix Build).
             
             ### Supported Architectures:
-            * Debian 12 (Bookworm) - PG 16, 17, 18
-            * Debian 13 (Trixie) - PG 16, 17, 18
+            PostgreSQL 16, 17, 18 on:
+            * Debian 12 (Bookworm)
+            * Debian 13 (Trixie)
+            * Rocky 8
+            * Rocky 9
           draft: false
           prerelease: false
           files:
