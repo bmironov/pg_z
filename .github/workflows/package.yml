@@ -162,13 +162,13 @@ jobs:
           DEB_ARCH=$(dpkg --print-architecture)
 
           # pickup generated files and copy them one level deeper for the "upload-artifacts" step
-          mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1.${MATRIX_DEBIAN}_amd64.deb
+          mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${{ env.PKG_VERSION }}-1.${MATRIX_DEBIAN}_amd64.deb
           mv ../*.deb ./
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pg${{ matrix.pg_version }}-pg-z-${{ matrix.debian_version }}-amd64-deb
+          name: pg${{ matrix.pg_version }}-pg-z-${{ env.PKG_VERSION }}-${{ matrix.debian_version }}-amd64-deb
           path: "*.deb"
 
   # ==============================================================================
@@ -342,7 +342,7 @@ jobs:
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pg${{ matrix.pg_version }}-pg-z-rocky${{ matrix.rocky_version }}-x86_64-rpm
+          name: pg${{ matrix.pg_version }}-pg-z-${{ env.PKG_VERSION }}-rocky${{ matrix.rocky_version }}-x86_64-rpm
           path: "rpm-packages/*.rpm"
 
   # ==============================================================================
