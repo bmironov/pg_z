@@ -163,12 +163,14 @@ jobs:
           make \
             PG_CONFIG="${{ env.DEB_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.DEB_CFLAGS }}" \
+            BITCODE_CFLAGS="${{ env.DEB_CFLAGS }}" \
             PG_LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread"
           TARGET_STAGE_DIR="$(pwd)/debian/postgresql-${MATRIX_PG}-pg-z"
           mkdir -p "$TARGET_STAGE_DIR"  
           make install DESTDIR="$TARGET_STAGE_DIR" \
             PG_CONFIG="${{ env.DEB_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.DEB_CFLAGS }}" \
+            BITCODE_CFLAGS="${{ env.DEB_CFLAGS }}" \
             PG_LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread"
 
           dpkg-buildpackage -us -uc -b
