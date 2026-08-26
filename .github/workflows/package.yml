@@ -98,6 +98,7 @@ jobs:
             ZNG_LIBS="-L/opt/zlib-ng/lib"
           fi
           echo "DEB_LIBS=$ZNG_LIBS $ZNG_LIB ${{ env.DEB_LIBS }}" >> $GITHUB_ENV
+          echo "DEB_LDFLAGS=-L$ZNG_LIBS ${{ env.DEB_LDFLAGS }}" >> $GITHUB_ENV
 
       - name: Prepare Dynamic Configuration Flags
         run: |
@@ -448,7 +449,7 @@ jobs:
             
             Automated production build matrix delivery assets array deployment completed.
 
-            * **Build Version**: `${{ needs.init.outputs.git_tag }}`
+            * **Build Version**: `${{ needs.init.outputs.git_tag }}` based on official PGDG directory layout.
             
             ### Distribution Packages Layout Matrix:
             * **Debian/Ubuntu**: `.deb` packages tailored for Postgres 16, 17, 18 (Architecture: `amd64`)
