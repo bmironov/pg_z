@@ -292,13 +292,13 @@ jobs:
           
           %build
           autoconf
-          
+
           ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
             LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
             LIBS="${{ env.RPM_LIBS}} -lpthread -lm"
           make \
-            PG_CONFIG="${{ env.RPM_PG_CONFIG }}"
+            PG_CONFIG="${{ env.RPM_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.RPM_CFLAGS }}"
 
           %install
