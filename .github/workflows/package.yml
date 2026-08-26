@@ -248,9 +248,7 @@ jobs:
           LIBS_LINKING="$LIBS_LINKING --with-link-zstd=dynamic --with-link-snappy=dynamic"
           echo "CONFIGURE_EXTRA_FLAGS=$LIBS_LINKING" >> $GITHUB_ENV
 
-          echo "RPM_CFLAGS=-I/usr/include ${{ env.RPM_CFLAGS }} -pthread" >> $GITHUB_ENV
-          echo "RPM_LDFLAGS=${{ env.RPM_LDFLAGS }} -pthread" >> $GITHUB_ENV
-          echo "LIBS=${{ env.LIBS }} -lpthread -lm" >> $GITHUB_ENV
+          echo "RPM_CFLAGS=-I/usr/include ${{ env.RPM_CFLAGS }}" >> $GITHUB_ENV
           
       - name: Build RPM Package
         run: |
@@ -296,9 +294,9 @@ jobs:
           autoconf
           
           ./configure ${{ env.CONFIGURE_EXTRA_FLAGS }} \
-            CFLAGS="${{ env.RPM_CFLAGS }}" \
-            LDFLAGS="${{ env.RPM_LDFLAGS }}" \
-            LIBS="${{ env.RPM_LIBS}}"
+            CFLAGS="${{ env.RPM_CFLAGS }} -pthread" \
+            LDFLAGS="${{ env.RPM_LDFLAGS }} -pthread" \
+            LIBS="${{ env.RPM_LIBS}} -lpthread -lm"
           make \
             PG_CONFIG="${{ env.RPM_PG_CONFIG }}"
             PG_CFLAGS="${{ env.RPM_CFLAGS }}"
