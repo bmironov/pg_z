@@ -127,7 +127,7 @@ jobs:
           PKG_ROOT="$(pwd)/pkg_root"
           mkdir -p "$PKG_ROOT/DEBIAN"
 
-          cat << EOF > "$PKG_ROOT/debian/changelog"
+          cat << EOF > "$PKG_ROOT/DEBIAN/changelog"
           pg-z (${PKG_VERSION}-1) ${MATRIX_DEBIAN}; urgency=low
 
             * Automated build from git tag ${GIT_TAG}.
