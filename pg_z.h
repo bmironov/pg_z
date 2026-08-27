@@ -60,7 +60,16 @@ Datum pg_z_version(PG_FUNCTION_ARGS);
  * ===============================================================
  */
 
+typedef int16 registry_index;
+
 void pg_mem_tracker_init_hugepage_size(void);
+bool pg_mem_tracker_overflow(void);
+registry_index pg_mem_tracker_registry_size(void);
+bool pg_mem_tracker_region_is_huge(registry_index index);
+size_t pg_mem_tracker_get_region_size(registry_index index);
+bool pg_mem_tracker_register(void *address, size_t size, bool is_huge);
+registry_index pg_mem_tracker_find(void *address);
+void pg_mem_tracker_unregister(registry_index index);
 
 /*
  * ===============================================================
@@ -69,6 +78,7 @@ void pg_mem_tracker_init_hugepage_size(void);
  */
 
 #define MIN_MEM_SIZE_8KB 8192
+#define MIN_HUGE_PAGE_SIZE ((size_t)2 * 1024 * 1024)
 
 /* Global variable to store the actual default Huge Page size of the OS */
 extern size_t huge_page_size;

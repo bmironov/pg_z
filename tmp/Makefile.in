@@ -4,7 +4,7 @@ DATA = pg_z--$(GIT_VERSION).sql
 CONTROL = pg_z.control
 VPATH = ..
 
-SRC_MODULES = pg_z mem_manager
+SRC_MODULES = pg_z mem_tracker mem_manager
 REGRESS := core db_params
 ALGO_MODULES = brotli gzip gzip_ng lz4 snappy zstd
 
