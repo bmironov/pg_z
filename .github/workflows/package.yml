@@ -145,7 +145,7 @@ jobs:
           Version: ${PKG_VERSION}-1
           Homepage: https://github.com/bmironov/pg_z
           Architecture: amd64
-          Depends: \${shlibs:Depends}, \${misc:Depends}, postgresql-${MATRIX_PG}
+          Depends: postgresql-${MATRIX_PG}
           Description: Collection of userspace functions providing access to compression algorithms inside PostgreSQL ${MATRIX_PG}
           EOF
 
