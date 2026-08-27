@@ -124,8 +124,10 @@ jobs:
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
           echo "Real Git Version identified as: ${VERSION_TAG}"
 
-          mkdir -p debian
-          cat << EOF > debian/changelog
+          PKG_ROOT="$(pwd)/pkg_root"
+          mkdir -p "$PKG_ROOT/debian"
+
+          cat << EOF > "$PKG_ROOT/debian/changelog"
           pg-z (${PKG_VERSION}-1) ${MATRIX_DEBIAN}; urgency=low
 
             * Automated build from git tag ${GIT_TAG}.
@@ -133,27 +135,21 @@ jobs:
            -- AI Packer <pack@example.com>  ${DEB_DATE}
           EOF
 
-          cat << EOF > debian/control
+          cat << EOF > "$PKG_ROOT/debian/control"
           Source: pg-z
           Section: database
           Priority: optional
           Maintainer: AI Packer <pack@example.com>
-          Build-Depends: debhelper-compat (= 13), postgresql-server-dev-${MATRIX_PG}, autoconf, automake
-          Standards-Version: 4.6.0
-
+          Build-Depends: postgresql-${MATRIX_PG}
           Package: postgresql-${MATRIX_PG}-pg-z
-          Architecture: any
+          Version: ${PKG_VERSION}-1
+          Homepage: https://github.com/bmironov/pg_z
+          Architecture: amd64
           Depends: \${shlibs:Depends}, \${misc:Depends}, postgresql-${MATRIX_PG}
           Description: Collection of userspace functions providing access to compression algorithms inside PostgreSQL ${MATRIX_PG}
           EOF
 
-          cat << 'EOF_R' > debian/rules
-          #!/usr/bin/make -f
-          %:; dh $@
-          EOF_R
-
-          chmod +x debian/rules
-
+          export PATH="/usr/lib/postgresql/${MATRIX_PG}/bin:$PATH"
           autoreconf -ifv --install
           ./configure --prefix=/usr ${{ env.CONFIGURE_EXTRA_FLAGS }} \
             CFLAGS="${{ env.DEB_CFLAGS }} -pthread" \
@@ -161,24 +157,19 @@ jobs:
             LIBS="${{ env.DEB_LIBS }} -lpthread -lm"
 
           make \
-            PG_CONFIG="${{ env.DEB_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.DEB_CFLAGS }}" \
             BITCODE_CFLAGS="${{ env.DEB_CFLAGS }}" \
             PG_LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread"
           TARGET_STAGE_DIR="$(pwd)/debian/postgresql-${MATRIX_PG}-pg-z"
           mkdir -p "$TARGET_STAGE_DIR"  
           make install DESTDIR="$TARGET_STAGE_DIR" \
-            PG_CONFIG="${{ env.DEB_PG_CONFIG }}" \
             PG_CFLAGS="${{ env.DEB_CFLAGS }}" \
             BITCODE_CFLAGS="${{ env.DEB_CFLAGS }}" \
             PG_LDFLAGS="${{ env.DEB_LDFLAGS }} -pthread"
 
-          dpkg-buildpackage -us -uc -b
-          DEB_ARCH=$(dpkg --print-architecture)
-
-          # pickup generated files and copy them one level deeper for the "upload-artifacts" step
-          mv ../postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1_${DEB_ARCH}.deb ../postgresql-${MATRIX_PG}-pg-z_${{ env.PKG_VERSION }}-1.${MATRIX_DEBIAN}_amd64.deb
-          mv ../*.deb ./
+          TARGET_DEB_NAME="postgresql-${MATRIX_PG}-pg-z_${PKG_VERSION}-1.${MATRIX_DEBIAN}_amd64.deb"
+          dpkg-deb --build "$PKG_ROOT" "../$TARGET_DEB_NAME"
+          mv "../$TARGET_DEB_NAME" ./
 
       - name: Upload DEB Artifact
         uses: actions/upload-artifact@v7
