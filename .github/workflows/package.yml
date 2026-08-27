@@ -125,7 +125,7 @@ jobs:
           echo "Real Git Version identified as: ${VERSION_TAG}"
 
           PKG_ROOT="$(pwd)/pkg_root"
-          mkdir -p "$PKG_ROOT/debian"
+          mkdir -p "$PKG_ROOT/DEBIAN"
 
           cat << EOF > "$PKG_ROOT/debian/changelog"
           pg-z (${PKG_VERSION}-1) ${MATRIX_DEBIAN}; urgency=low
@@ -135,7 +135,7 @@ jobs:
            -- AI Packer <pack@example.com>  ${DEB_DATE}
           EOF
 
-          cat << EOF > "$PKG_ROOT/debian/control"
+          cat << EOF > "$PKG_ROOT/DEBIAN/control"
           Source: pg-z
           Section: database
           Priority: optional
