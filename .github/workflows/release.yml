@@ -75,8 +75,8 @@ jobs:
         with:
           name: release-pg_z-archives
           path: |
-            packages/pg_z-*.tar.gz
-            packages/pg_z-*.zip
+            build/packages/pg_z-*.tar.gz
+            build/packages/pg_z-*.zip
           archive: false
 
   # ==============================================================================
