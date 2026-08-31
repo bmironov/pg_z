@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       custom_version:
-        description: "Manual Version Tag Override (e.g., 1.0.0)"
+        description: "Version Tag Override (eg, 1.0.0)"
         required: false
         default: ""
 

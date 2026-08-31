@@ -33,4 +33,4 @@ RUN set -e \
 FROM scratch AS export-stage
 ARG TARGET_DIR
 ARG ARCHIVE_NAME
-COPY --from=packaging-stage "/${TARGET_DIR}/${ARCHIVE_NAME}*" /
+COPY --from=packaging-stage "/${TARGET_DIR}/${ARCHIVE_NAME}**" /
