@@ -15,24 +15,20 @@ ARG ARCHIVE_NAME
 ENV TARGET="/${TARGET_DIR}/${ARCHIVE_NAME}"
 ENV TAR_GZ="${TARGET}.tar.gz"
 ENV ZIP="${TARGET}.zip"
-ENV SANDBOX="/sandbox"
+ENV SOURCE="/source"
 
-ENV BUILD_DIR="/build"
-WORKDIR "${BUILD_DIR}"
+RUN apk add --no-cache zip
 
-RUN apk add --no-cache git zip tar bash
-
+WORKDIR "$SOURCE"
 COPY . .
 
+WORKDIR "/${TARGET_DIR}"
 RUN set -e \
-    && mkdir -p "/${TARGET_DIR}" \
-    && git config --global --add safe.directory '*' \
-    && git archive --format=tar.gz --prefix="${ARCHIVE_NAME}/" -o "${TAR_GZ}" "$PG_Z_VERSION" \
-    && mkdir -p "${SANDBOX}" \
-    && tar -zxf "${TAR_GZ}" -C "${SANDBOX}" \
-    && cd "${SANDBOX}" \
-    && zip -q -r "${ZIP}" * \
-    && rm -rf "${SANDBOX}"
+    && tar -czf "${TAR_GZ}" --exclude=".git" -C "${SOURCE}" .
+
+WORKDIR "${SOURCE}"
+RUN set -e \
+    && zip -q -r "${ZIP}" . -x "*.git*"
 
 
 # ==============================================================================
