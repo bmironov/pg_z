@@ -72,9 +72,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-archives
-          path: |
-            packages/pg_z-*.tar.gz
-            packages/pg_z-*.zip
+          path: packages/pg_z-*.{tar.gz,zip}
           retention-days: 1
 
   # ==============================================================================
