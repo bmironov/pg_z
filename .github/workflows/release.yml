@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-name: New VErsion Release Pipeline
+name: New Version Release Pipeline
 
 on:
   push:
