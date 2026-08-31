@@ -36,6 +36,7 @@ DOCKER_BUILDKIT=1 docker build \
     --output ${TARGET_DIR} \
     -f Dockerfile.zip-build ..
 
-echo ${TARGET_DIR}
+echo "PWD: " $(pwd)
+echo "TARGET_DIR: ${TARGET_DIR}"
 ls -la ${TARGET_DIR}
 echo "Done! Packages successfully generated inside ./${TARGET_DIR} directory."
