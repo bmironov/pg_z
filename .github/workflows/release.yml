@@ -53,9 +53,6 @@ jobs:
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
-        with:
-          repository: ${{ github.repository }}
-          fetch-depth: 0
 
       - name: Execute Autonomous Archive Packager
         run: |
