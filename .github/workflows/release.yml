@@ -62,6 +62,8 @@ jobs:
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Execute Autonomous Archive Packager
         run: |
@@ -72,7 +74,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-archives
-          path: packages/pg_z-*.{tar.gz,zip}
+          path: packages/pg_z-*
           retention-days: 1
 
   # ==============================================================================
