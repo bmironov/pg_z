@@ -33,6 +33,12 @@ jobs:
           else
             VERSION=$(echo "${{ github.ref_name }}" | tr -d '\n')
           fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "⚠️  Ref '$VERSION' is not a valid 3-digit tag version. Falling back to 0.0.1"
+            VERSION="0.0.1"
+          fi
+
           echo "RESOLVED_VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "Pipeline version initialized: v${VERSION}"
 
@@ -48,7 +54,8 @@ jobs:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # Скачиваем полную историю Git для корректной работы git archive
+          repository: ${{ github.repository }}
+          fetch-depth: 0
 
       - name: Execute Autonomous Archive Packager
         run: |
@@ -81,6 +88,7 @@ jobs:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
         with:
+          repository: ${{ github.repository }}
           fetch-depth: 0
 
       - name: Set up Docker Buildx Context Engine

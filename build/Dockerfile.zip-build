@@ -25,8 +25,8 @@ RUN apk add --no-cache git zip tar bash
 COPY . .
 
 RUN set -e \
-    && git config --global --add safe.directory '*' \
     && mkdir -p "/${TARGET_DIR}" \
+    && git config --global --add safe.directory '*' \
     && git archive --format=tar.gz --prefix="${ARCHIVE_NAME}/" -o "${TAR_GZ}" "$PG_Z_VERSION" \
     && mkdir -p "${SANDBOX}" \
     && tar -zxf "${TAR_GZ}" -C "${SANDBOX}" \
