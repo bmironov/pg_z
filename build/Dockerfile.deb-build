@@ -20,7 +20,7 @@ ARG ZSTD_VERSION
 # ==============================================================================
 # MAIN COMPILATION STAGE
 # ==============================================================================
-FROM ${OS_FAMILY}:${OS_VERSION} AS packing-stage
+FROM ${OS_FAMILY}:${OS_VERSION} AS packaging-stage
 ARG OS_FAMILY
 ARG OS_VERSION
 ARG OS_MIRROR
@@ -255,4 +255,4 @@ RUN dpkg-deb --build "${PKG_ROOT}" "/${TARGET_DIR}/${DEB_FILENAME}"
 # ==============================================================================
 FROM scratch AS export-stage
 ARG TARGET_DIR
-COPY --from=packing-stage "/${TARGET_DIR}/*.deb" /
+COPY --from=packaging-stage "/${TARGET_DIR}/*.deb" /
