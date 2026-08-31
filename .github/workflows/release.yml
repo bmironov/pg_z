@@ -74,8 +74,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-archives
-          path: packages/pg_z-*
-          retention-days: 1
+          path: |
+            packages/pg_z-*.tar.gz
+            packages/pg_z-*.zip
+          archive: false
 
   # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
