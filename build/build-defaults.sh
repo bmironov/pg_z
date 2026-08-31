@@ -64,7 +64,7 @@ get_os_mirror() {
         # echo "http://cdn-aws.deb.debian.org"
         ;;
     $OS_FAMILY_UBUNTU)
-        echo "http://ubuntu.org"
+        echo "http://archive.ubuntu.org"
         # echo "http://cdn-aws.archive.ubuntu.com"
         ;;
     *)
