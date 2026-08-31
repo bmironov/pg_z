@@ -92,7 +92,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Docker Buildx Context Engine
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Execute Unified Compiler & Regression Test Harness
         run: |
