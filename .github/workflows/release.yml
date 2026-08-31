@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-name: New Version Release Pipeline
+name: New Version Release
 
 on:
   push:
@@ -111,6 +111,7 @@ jobs:
           name: release-pg_z-deb-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
           path: build/packages/*.deb
           retention-days: 1
+          archive: false
 
   # ==============================================================================
   # UNIFIED RELEASER & ARTIFACT SHIPPER
