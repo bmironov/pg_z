@@ -60,12 +60,12 @@ get_os_mirror() {
 
     case "$OS_FAMILY" in
     $OS_FAMILY_DEBIAN)
-        # echo "http://cdn-aws.deb.debian.org"
         echo "http://deb.debian.org"
+        # echo "http://cdn-aws.deb.debian.org"
         ;;
     $OS_FAMILY_UBUNTU)
-        # echo "http://cdn-aws.archive.ubuntu.com"
         echo "http://ubuntu.org"
+        # echo "http://cdn-aws.archive.ubuntu.com"
         ;;
     *)
         echo "Requested OS '$OS_FAMILY' is not in supported list ($SUPPORTED_OS_LIST)" >&2

@@ -17,16 +17,17 @@ ENV TAR_GZ="${TARGET}.tar.gz"
 ENV ZIP="${TARGET}.zip"
 ENV SOURCE="/source"
 
-RUN apk add --no-cache zip
+RUN apk add --no-cache zip \
+    && mkdir -p "${TARGET_DIR}"
 
-WORKDIR "$SOURCE"
+WORKDIR "${SOURCE}"
 COPY . .
 RUN set -e \
-    && zip -q -r "${ZIP}" . -x "*.git*"
+    && zip -q -r "${ZIP}" . -x "*.git*" -x "${TARGET_DIR}"
 
 WORKDIR "${TARGET_DIR}"
 RUN set -e \
-    && tar -czf "${TAR_GZ}" --exclude=".git" -C "${SOURCE}" .
+    && tar -czf "${TAR_GZ}" --exclude=".git" --exclude="${TARGET_DIR}" -C "${SOURCE}" .
 
 
 # ==============================================================================
