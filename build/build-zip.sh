@@ -15,8 +15,8 @@ usage() {
 
 PG_Z_VERSION=$(get_pg_z_version "$1")
 
-DOCKER_TAG="pg-z:${PG_Z_VERSION}-archive"
-ARCHIVE_NAME=$(echo ${DOCKER_TAG} | tr ':' '_')
+DOCKER_TAG="pg_z:${PG_Z_VERSION}-archive"
+ARCHIVE_NAME=$(echo ${DOCKER_TAG} | tr ':' '-')
 rm -f ./${TARGET_DIR}/${ARCHIVE_NAME}*
 
 echo "=== Building and Exporting pg_z Source Code ==="
