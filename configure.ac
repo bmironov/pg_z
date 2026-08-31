@@ -16,6 +16,11 @@ AC_CHECK_LIB([m], [cos]) # Required for static linking of Brotli
 # COMMAND LINE ARGUMENTS & OPTIONS FOR --help
 # ===========================================================================
 
+AC_ARG_ENABLE([package-build],
+    [AS_HELP_STRING([--enable-package-build], [Enable total static compilation context for automated package builders])],
+    [is_package_build=$enableval],
+    [is_package_build=no]
+)
 # Enable/Disable specific compression algorithms (default: yes)
 AC_ARG_WITH([brotli],
             [AS_HELP_STRING([--with-brotli],  [include Brotli support (yes/no) [default=yes]])],
@@ -75,14 +80,16 @@ AC_ARG_WITH([link-zstd],
 
 # Resolve smart defaults based on OS family
 AS_IF([test "x$is_debian" = "xyes"], [
-    case "$SNAPPY" in
-        default) SNAPPY=dynamic ;;
-        static)  AC_MSG_ERROR([Snappy can only be linked dynamically on Debian/Ubuntu due to missing static archives. Please use --with-link-snappy=dynamic]) ;;
-    esac
-    case "$ZLIB" in
-        default) ZLIB=dynamic ;;
-        static) AC_MSG_ERROR([Standard zlib can only be linked dynamically on Debian/Ubuntu due to missing -fPIC. Please use --with-link-gzip=dynamic]) ;;
-    esac
+    AS_IF([test "x$is_package_build" != "xyes"], [
+        case "$SNAPPY" in
+            default) SNAPPY=dynamic ;;
+            static)  AC_MSG_ERROR([Snappy can only be linked dynamically on Debian/Ubuntu due to missing static archives. Please use --with-link-snappy=dynamic]) ;;
+        esac
+        case "$ZLIB" in
+            default) ZLIB=dynamic ;;
+            static) AC_MSG_ERROR([Standard zlib can only be linked dynamically on Debian/Ubuntu due to missing -fPIC. Please use --with-link-gzip=dynamic]) ;;
+        esac
+    ])
 ], [
     AS_IF([test "x$SNAPPY" = "xdefault"], [SNAPPY=static])
 ])

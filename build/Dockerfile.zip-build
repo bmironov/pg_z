@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+
+ARG TARGET_DIR
+ARG PG_Z_VERSION
+ARG ARCHIVE_NAME
+
+# ==============================================================================
+# MAIN COMPILATION STAGE
+# ==============================================================================
+FROM alpine:latest AS packing-stage
+ARG TARGET_DIR
+ARG PG_Z_VERSION
+ARG ARCHIVE_NAME
+
+ENV TARGET="/${TARGET_DIR}/${ARCHIVE_NAME}"
+ENV TAR_GZ="${TARGET}.tar.gz"
+ENV ZIP="${TARGET}.zip"
+ENV SANDBOX="/sandbox"
+
+ENV BUILD_DIR="/build"
+WORKDIR "${BUILD_DIR}"
+
+RUN apk add --no-cache git zip tar bash
+
+COPY . .
+
+WORKDIR "/${TARGET_DIR}"
+RUN set -e \
+    && git archive --format=tar.gz --prefix="${ARCHIVE_NAME}/" -o "${TAR_GZ}" "$PG_Z_VERSION" \
+    && mkdir -p "${SANDBOX}" \
+    && tar -zxf "${TAR_GZ}" -C "${SANDBOX}" \
+    && cd "${SANDBOX}" \
+    && zip -q -r "${ZIP}" \
+    && rm -rf "${SANDBOX}"
+
+
+# ==============================================================================
+# PURE EXPORT STAGE
+# ==============================================================================
+FROM scratch AS export-stage
+ARG TARGET_DIR
+ARG ARCHIVE_NAME
+COPY --from=packing-stage "/${TARGET_DIR}/${ARCHIVE_NAME}*" /

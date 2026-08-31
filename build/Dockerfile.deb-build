@@ -1,0 +1,258 @@
+# syntax=docker/dockerfile:1
+
+ARG OS_FAMILY
+ARG OS_VERSION
+ARG OS_MIRROR
+ARG REPO_COMPONENTS
+ARG SECURITY_PATH
+ARG PG_VERSION
+ARG PG_Z_VERSION
+ARG TARGET_DIR
+ARG DEB_FILENAME
+
+ARG BROTLI_VERSION
+ARG LZ4_VERSION
+ARG SNAPPY_VERSION
+ARG ZLIB_VERSION
+ARG ZLIB_NG_VERSION
+ARG ZSTD_VERSION
+
+# ==============================================================================
+# MAIN COMPILATION STAGE
+# ==============================================================================
+FROM ${OS_FAMILY}:${OS_VERSION} AS packing-stage
+ARG OS_FAMILY
+ARG OS_VERSION
+ARG OS_MIRROR
+ARG REPO_COMPONENTS
+ARG SECURITY_PATH
+ARG PG_VERSION
+ARG PG_Z_VERSION
+ARG TARGET_DIR
+ARG DEB_FILENAME
+
+ARG BROTLI_VERSION
+ARG LZ4_VERSION
+ARG SNAPPY_VERSION
+ARG ZLIB_VERSION
+ARG ZLIB_NG_VERSION
+ARG ZSTD_VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CFLAGS="-I/usr/include -pthread"
+ENV LDFLAGS=""
+ENV SYS_LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib -pthread"
+ENV LIBS=""
+ENV SYS_LIBS="-lpthread -lm -lstdc++"
+ENV ALGO_LIST=""
+
+# VALIDATION PHASE
+RUN set -e  && \
+    if [ -z "${OS_MIRROR}" ] || [ -z "${REPO_COMPONENTS}" ] \
+    || [ -z "${SECURITY_PATH}" ] \
+    || [ -z "${PG_VERSION}" ] || [ -z "${PG_Z_VERSION}" ] \
+    || [ -z "${TARGET_DIR}" ] || [ -z "${DEB_FILENAME}" ] \
+    || [ -z "${BROTLI_VERSION}" ] || [ -z "${LZ4_VERSION}" ] \
+    || [ -z "${SNAPPY_VERSION}" ] || [ -z "${ZLIB_VERSION}" ] \
+    || [ -z "${ZLIB_NG_VERSION}" ] || [ -z "${ZSTD_VERSION}" ]; then \
+    echo "=========================================================================" ; \
+    echo "🚨 CRITICAL CONFIGURATION ERROR: One or more build arguments are missing!"; \
+    echo "Ensure you are running the build via build-deb.sh which sources defaults.sh" ; \
+    echo "=========================================================================" ; \
+    exit 1; \
+    fi
+
+# Core Compiler Toolchain (Cached permanently)
+RUN set -e \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && echo "deb ${OS_MIRROR}/${OS_FAMILY}/ ${OS_VERSION} ${REPO_COMPONENTS}" > /etc/apt/sources.list \
+    && echo "deb ${OS_MIRROR}/${OS_FAMILY}/ ${OS_VERSION}-updates ${REPO_COMPONENTS}" >> /etc/apt/sources.list \
+    && echo "deb ${OS_MIRROR}/${SECURITY_PATH}/ ${OS_VERSION}-security ${REPO_COMPONENTS}" >> /etc/apt/sources.list \
+    && apt-get update && apt-get install -y git curl ca-certificates \
+    gnupg2 build-essential cmake autoconf automake devscripts debhelper \
+    g++ clang llvm llvm-dev
+
+# Selected PostgreSQL Repository & Headers Installation (Native vs PGDG)
+RUN apt-get install -y postgresql-common \
+    && (echo | /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh) \
+    && apt-get update \
+    && apt-get install -y postgresql-${PG_VERSION} postgresql-server-dev-${PG_VERSION}
+
+# Compile Static Modern Brotli
+WORKDIR /build/brotli
+RUN curl -L -O "https://github.com/google/brotli/archive/refs/tags/v${BROTLI_VERSION}.tar.gz" \
+    && tar -xzf v${BROTLI_VERSION}.tar.gz \
+    && cd brotli-${BROTLI_VERSION} \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_INSTALL_PREFIX=/opt/brotli \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+ENV ALGO_LIST="${ALGO_LIST} Brotli"
+ENV CFLAGS="-I/opt/brotli/include -I/opt/brotli/include/brotli ${CFLAGS}"
+ENV LDFLAGS="-L/opt/brotli/lib ${LDFLAGS}"
+ENV LIBS="/opt/brotli/lib/libbrotlienc.a /opt/brotli/lib/libbrotlidec.a /opt/brotli/lib/libbrotlicommon.a ${LIBS}"
+
+# Compile Static Vanilla zlib
+WORKDIR /build/zlib
+RUN curl -L -O "https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VERSION}.tar.gz" \
+    && tar -xzf v${ZLIB_VERSION}.tar.gz \
+    && cd zlib-${ZLIB_VERSION} \
+    && CFLAGS="-fPIC -O3" ./configure --prefix=/opt/zlib --static \
+    && make -j$(nproc) && make install
+ENV ALGO_LIST="${ALGO_LIST} Gzip/Deflate"
+ENV CFLAGS="-I/opt/zlib/include ${CFLAGS}"
+ENV LDFLAGS="-L/opt/zlib/lib ${LDFLAGS}"
+ENV LIBS="/opt/zlib/lib/libz.a ${LIBS}"
+
+# Compile Static zlib-ng in NATIVE mode only (ZLIB_COMPAT=OFF)
+WORKDIR /build/zlib-ng
+RUN curl -L -O "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" \
+    && tar -xzf "${ZLIB_NG_VERSION}.tar.gz" \
+    && cd "zlib-ng-${ZLIB_NG_VERSION}" \
+    && mkdir build \
+    && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DZLIB_COMPAT=OFF \
+    -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng \
+    -DZLIB_ENABLE_TESTS=OFF \
+    && cmake --build . --parallel $(nproc) && cmake --install .
+ENV ALGO_LIST="${ALGO_LIST} Gzip-NG/Deflate-NG"
+ENV CFLAGS="-I/opt/zlib-ng/include ${CFLAGS}"
+ENV LDFLAGS="-L/opt/zlib-ng/lib ${LDFLAGS}"
+ENV LIBS="/opt/zlib-ng/lib/libz-ng.a ${LIBS}"
+
+# Compile Static Modern LZ4
+WORKDIR /build/lz4
+RUN curl -L -O "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz" \
+    && tar -xzf v${LZ4_VERSION}.tar.gz \
+    && cd lz4-${LZ4_VERSION} \
+    && make -j$(nproc) CFLAGS="-fPIC -O3" \
+    && make install PREFIX=/opt/lz4
+ENV ALGO_LIST="${ALGO_LIST} Lz4"
+ENV CFLAGS="-I/opt/lz4/include ${CFLAGS}"
+ENV LDFLAGS="-L/opt/lz4/lib ${LDFLAGS}"
+ENV LIBS="/opt/lz4/lib/liblz4.a ${LIBS}"
+
+# Compile Static Modern Snappy
+WORKDIR /build/snappy
+RUN curl -L -O "https://github.com/google/snappy/archive/refs/tags/${SNAPPY_VERSION}.tar.gz" \
+    && tar -xzf "${SNAPPY_VERSION}.tar.gz" \
+    && cd "snappy-${SNAPPY_VERSION}" \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DCMAKE_INSTALL_PREFIX=/opt/snappy \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+ENV ALGO_LIST="${ALGO_LIST} Snappy"
+ENV CFLAGS="-I/opt/snappy/include ${CFLAGS}"
+ENV LDFLAGS="-L/opt/snappy/lib ${LDFLAGS}"
+ENV LIBS="/opt/snappy/lib/libsnappy.a ${LIBS}"
+
+# Compile Static Modern Zstandard
+WORKDIR /build/zstd
+RUN curl -L -O "https://github.com/facebook/zstd/archive/refs/tags/v${ZSTD_VERSION}.tar.gz" \
+    && tar -xzf v${ZSTD_VERSION}.tar.gz \
+    && cd zstd-${ZSTD_VERSION} \
+    && make -j$(nproc) CFLAGS="-fPIC -O3" \
+    && make install PREFIX=/opt/zstd
+ENV ALGO_LIST="${ALGO_LIST} Zstd"
+ENV CFLAGS="-I/opt/zstd/include ${CFLAGS}"
+ENV LDFLAGS="-L/opt/zstd/lib ${LDFLAGS}"
+ENV LIBS="/opt/zstd/lib/libzstd.a ${LIBS}"
+
+ENV PATH="/usr/lib/postgresql/${PG_VERSION}/bin:/usr/bin:$PATH"
+ENV PKG_ROOT="/tmp/pkg_root"
+
+
+WORKDIR "/${TARGET_DIR}"
+COPY . .
+
+RUN set -e \
+    && echo "${PG_Z_VERSION}" > VERSION \
+    && autoreconf -ifv --install \
+    && echo "CFLAGS=$CFLAGS" \
+    && echo "LDFLAGS=$LDFLAGS" \
+    && echo "LIBS=$LIBS" \
+    && echo "SYS_LIBS=$SYS_LIBS" \
+    # configure environment
+    && ./configure --prefix=/usr \
+    --enable-package-build \
+    --with-link-brotli=static \
+    --with-link-gzip=static \
+    --with-link-gzip-ng=static \
+    --with-link-lz4=static \
+    --with-link-snappy=static \
+    --with-link-zstd=static \
+    CFLAGS="${CFLAGS} -Wno-vla" \
+    LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
+    LIBS="${SYS_LIBS}" \
+    # build extension
+    && make \
+    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
+    SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    # install extension to run tests
+    && make install \
+    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
+    SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    # override default expected results with PG version specific outputs
+    && ([ -d expected/postgresql-${PG_VERSION} ] && cp expected/postgresql-${PG_VERSION}/*.out expected/ 2>/dev/null || true) \
+    # run tests
+    && chown -R postgres:postgres /${TARGET_DIR} \
+    && su - postgres -c "pg_ctlcluster ${PG_VERSION} main start" \
+    && su - postgres -c "psql -c \"SELECT version(); CREATE EXTENSION pg_z;\"" \
+    && su - postgres -c "cd /${TARGET_DIR}; make installcheck" \
+    # build extension in target dir for packaging
+    && make install DESTDIR="${PKG_ROOT}" \
+    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
+    SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    && rm -rf build \
+    && mkdir -p ${PKG_ROOT}/DEBIAN \
+    && PKG_SIZE=$(du -ks "${PKG_ROOT}" | cut -f1) \
+    && ALGO_LIST=$(echo "${ALGO_LIST}" | xargs | sed 's/ /, /g') \
+    && cat <<EOF > "$PKG_ROOT/DEBIAN/control"
+Package: postgresql-${PG_VERSION}-pg-z
+Version: ${PG_Z_VERSION}-1
+Section: database
+Priority: optional
+Architecture: amd64
+Maintainer: AI Packer <pack@example.com>
+Homepage: https://github.com/bmironov/pg_z
+Installed-Size: ${PKG_SIZE}
+License: PostgreSQL
+Depends: postgresql-${PG_VERSION}
+Enhances: postgresql-${PG_VERSION}
+Description: PostgreSQL v${PG_VERSION} extension pg_z v${PG_Z_VERSION}
+ This extension provides userspace functions
+ to compress / decompress data via many modern algorithms:
+ ${ALGO_LIST}.
+ .
+ This is ${OS_FAMILY}-${OS_VERSION} package.
+EOF
+
+RUN dpkg-deb --build "${PKG_ROOT}" "/${TARGET_DIR}/${DEB_FILENAME}"
+
+
+# ==============================================================================
+# PURE EXPORT STAGE
+# ==============================================================================
+FROM scratch AS export-stage
+ARG TARGET_DIR
+COPY --from=packing-stage "/${TARGET_DIR}/*.deb" /

@@ -8,7 +8,7 @@ SRC_MODULES = pg_z mem_manager
 REGRESS := core db_params
 ALGO_MODULES = brotli gzip gzip_ng lz4 snappy zstd
 
-PG_CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+override PG_CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
 -include ../Makefile.port
 
@@ -64,7 +64,7 @@ else
 	STRIP_CMD = strip --strip-unneeded $(shlib)
 endif
 
-PG_CFLAGS += $(COMPRESSION_CFLAGS)
+override PG_CFLAGS += $(COMPRESSION_CFLAGS)
 
 PG_LDFLAGS += -L/usr/lib/x86_64-linux-gnu
 SHLIB_LINK += -Wl,-Bstatic  -Wl,--start-group $(STATIC_LIBS) -Wl,--end-group \

@@ -1,0 +1,154 @@
+# syntax=docker/dockerfile:1
+name: Production Release Pipeline
+
+on:
+  push:
+    tags:
+      - '[0-9]+\.[0-9]+\.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      custom_version:
+        description: "Manual Version Tag Override (e.g., 1.0.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  # ==============================================================================
+  # CENTRALIZED CONFIGURATION & VERSION INITIALIZATION
+  # ==============================================================================
+  init:
+    name: Initialize Pipeline Context
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version-resolver.outputs.RESOLVED_VERSION }}
+    steps:
+      - name: Compute Target Extension Version
+        id: version-resolver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.custom_version }}" ]; then
+            VERSION="${{ github.event.inputs.custom_version }}"
+          else
+            VERSION=$(echo "${{ github.ref_name }}" | tr -d '\n')
+          fi
+          echo "RESOLVED_VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Pipeline version initialized: v${VERSION}"
+
+  # ==============================================================================
+  # PACKAGING SOURCE ARCHIVES (.ZIP & .TAR.GZ)
+  # ==============================================================================
+  build-archives:
+    if: true
+    name: Build Source Archives
+    runs-on: ubuntu-latest
+    needs: init
+    steps:
+      - name: Checkout Source Code Tree
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Скачиваем полную историю Git для корректной работы git archive
+
+      - name: Execute Autonomous Archive Packager
+        run: |
+          chmod +x ./build/build-zip.sh
+          ./build/build-zip.sh "${{ needs.init.outputs.version }}"
+
+      - name: Stash Source Archives as Intermediate Workflow Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-pg_z-archives
+          path: build/packages/pg_z-*.**
+          retention-days: 1
+
+  # ==============================================================================
+  # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
+  # ==============================================================================
+  build-deb:
+    if: true
+    name: Compile Debian Package
+    runs-on: ubuntu-latest
+    needs: init
+    strategy:
+      fail-fast: false # Failure in one build won't stop others
+      matrix:
+        # Supported Debian and Ubuntu LTS versions
+        os_version: [trixie]
+        # Supported PostgreSQL versions
+        pg_version: [16]
+    steps:
+      - name: Checkout Source Code Tree
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx Context Engine
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+
+      - name: Execute Unified Compiler & Regression Test Harness
+        run: |
+          chmod +x ./build/build-deb.sh
+          ./build/build-deb.sh "${{ matrix.os_version }}" "${{ matrix.pg_version }}" "${{ needs.init.outputs.version }}"
+
+      - name: Stash Compiled .DEB Packages as Intermediate Workflow Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-pg_z-deb-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
+          path: build/packages/*.deb
+          retention-days: 1
+
+  # ==============================================================================
+  # UNIFIED RELEASER & ARTIFACT SHIPPER
+  # ==============================================================================
+  publish-release:
+    if: false
+    name: Publish Production GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-archives, build-deb]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository Context
+        uses: actions/checkout@v5
+
+      - name: Create Local Artifact Staging Workspace
+        run: mkdir -p dist-assets/
+
+      - name: Retrieve Stashed Source Archives
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-pg_z-archives
+          path: dist-assets/
+          merge-multiple: true
+
+      - name: Retrieve Stashed Compiled .DEB Packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-pg_z-deb-*
+          path: dist-assets/
+          merge-multiple: true
+
+      - name: Verify Extracted Release Asset Matrix
+        run: |
+          echo "=== The following artifacts are ready for deployment ==="
+          ls -la dist-assets
+
+      - name: Deploy Production Release & Ship Verified Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.init.outputs.version }}
+          name: "Release pg_z v${{ needs.init.outputs.version }}"
+          # Automatically analyze commits between previous and current tags
+          # and generates list of changes
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            dist-assets/*.tar.gz
+            dist-assets/*.zip
+            dist-assets/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
