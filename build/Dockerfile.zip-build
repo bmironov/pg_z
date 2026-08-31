@@ -26,11 +26,11 @@ COPY . .
 
 RUN set -e \
     && mkdir -p "/${TARGET_DIR}" \
-    && git config --global --add safe.directory '*' \
-    && git archive --format=tar.gz --prefix="${ARCHIVE_NAME}/" -o "${TAR_GZ}" "$PG_Z_VERSION" \
-    && mkdir -p "${SANDBOX}" \
-    && tar -zxf "${TAR_GZ}" -C "${SANDBOX}" \
-    && cd "${SANDBOX}" \
+    && git config --global --add safe.directory '*'
+RUN git archive --format=tar.gz --prefix="${ARCHIVE_NAME}/" -o "${TAR_GZ}" "$PG_Z_VERSION"
+RUN mkdir -p "${SANDBOX}" \
+    && tar -zxf "${TAR_GZ}" -C "${SANDBOX}"
+RUN cd "${SANDBOX}" \
     && zip -q -r "${ZIP}" * \
     && rm -rf "${SANDBOX}"
 
