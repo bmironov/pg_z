@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-name: Production Release Pipeline
+name: New VErsion Release Pipeline
 
 on:
   push:
@@ -82,7 +82,7 @@ jobs:
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
   # ==============================================================================
   build-deb:
-    if: false
+    if: true
     name: Compile Debian Package
     runs-on: ubuntu-latest
     needs: init
@@ -90,9 +90,9 @@ jobs:
       fail-fast: false # Failure in one build won't stop others
       matrix:
         # Supported Debian and Ubuntu LTS versions
-        os_version: [trixie]
+        os_version: [bookworm, trixie, noble, jammy, resolute]
         # Supported PostgreSQL versions
-        pg_version: [16]
+        pg_version: [16, 17, 18]
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
