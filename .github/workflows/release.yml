@@ -75,7 +75,7 @@ jobs:
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
   # ==============================================================================
   build-deb:
-    if: true
+    if: false
     name: Compile Debian Package
     runs-on: ubuntu-latest
     needs: init
