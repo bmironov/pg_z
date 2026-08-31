@@ -90,9 +90,10 @@ jobs:
       fail-fast: false # Failure in one build won't stop others
       matrix:
         # Supported Debian and Ubuntu LTS versions
-        os_version: [bookworm, trixie, noble, jammy, resolute]
+        #os_version: [bookworm, trixie, noble, jammy, resolute]
+        os_version: [jammy]
         # Supported PostgreSQL versions
-        pg_version: [16, 17, 18]
+        pg_version: [16]
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
