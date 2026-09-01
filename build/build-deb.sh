@@ -3,16 +3,16 @@
 set -e
 cd "$(dirname "$0")"
 SCRIPT_NAME=$(basename $0)
-source ./build-defaults.sh
+source ./build-common.sh
 mkdir -p "$TARGET_DIR"
 
 usage() {
     echo "Usage:"
-    echo "$SCRIPT_NAME os_version pg_version [pg_z_version]"
+    echo "  $SCRIPT_NAME os_version pg_version [pg_z_version]"
     echo "Where:"
-    echo "os_version   - OS version from list: $OS_VERSIONS_LIST"
-    echo "pg_version   - PostgreSQL version from list: $PG_VERSIONS_LIST"
-    echo "pg_z_version - (optional) latest, if not provided, or tag from git repository"
+    echo "  os_version   - OS version from list: $DEBIAN_VERSIONS_LIST"
+    echo "  pg_version   - PostgreSQL version from list: $PG_VERSIONS_LIST"
+    echo "  pg_z_version - (optional) latest, if not provided, or tag from git repository"
 }
 
 OS_VERSION=$1
@@ -27,7 +27,7 @@ if [ "a$OS_VERSION" == "a" -o "a$PG_VERSION" == "a" ]; then
     exit $ERR_NOT_ENOUGH_PARAMETERS
 fi
 
-OS_FAMILY=$(get_os_family $OS_VERSION)
+OS_FAMILY=$(get_debian_os_family $OS_VERSION)
 check_pg_version $PG_VERSION
 OS_MIRROR=$(get_os_mirror $OS_FAMILY)
 REPO_COMPONENTS=$(get_repo_components $OS_FAMILY)

@@ -2,20 +2,7 @@
 
 ARG OS_FAMILY
 ARG OS_VERSION
-ARG OS_MIRROR
-ARG REPO_COMPONENTS
-ARG SECURITY_PATH
-ARG PG_VERSION
-ARG PG_Z_VERSION
 ARG TARGET_DIR
-ARG DEB_FILENAME
-
-ARG BROTLI_VERSION
-ARG LZ4_VERSION
-ARG SNAPPY_VERSION
-ARG ZLIB_VERSION
-ARG ZLIB_NG_VERSION
-ARG ZSTD_VERSION
 
 # ==============================================================================
 # MAIN COMPILATION STAGE
@@ -187,29 +174,19 @@ RUN set -e \
     && echo "LIBS=$LIBS" \
     && echo "SYS_LIBS=$SYS_LIBS" \
     # configure environment
-    && ./configure --prefix=/usr \
-    --enable-package-build \
-    --with-link-brotli=static \
-    --with-link-gzip=static \
-    --with-link-gzip-ng=static \
-    --with-link-lz4=static \
-    --with-link-snappy=static \
-    --with-link-zstd=static \
-    CFLAGS="${CFLAGS} -Wno-vla" \
-    LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
-    LIBS="${SYS_LIBS}" \
+    && ./configure --prefix=/usr --enable-package-build \
+    --with-link-brotli=static    --with-link-gzip=static \
+    --with-link-gzip-ng=static   --with-link-lz4=static \
+    --with-link-snappy=static    --with-link-zstd=static \
+    CFLAGS="${CFLAGS} -Wno-vla" LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" LIBS="${SYS_LIBS}" \
     # build extension
     && make \
-    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" \
-    PG_CFLAGS="${CFLAGS} -Wno-vla" \
-    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
-    SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    BITCODE_CFLAGS="${CFLAGS} -Wno-vla"    PG_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
     # install extension to run tests
     && make install \
-    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" \
-    PG_CFLAGS="${CFLAGS} -Wno-vla" \
-    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
-    SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    BITCODE_CFLAGS="${CFLAGS} -Wno-vla"    PG_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
     # override default expected results with PG version specific outputs
     && ([ -d expected/postgresql-${PG_VERSION} ] && cp expected/postgresql-${PG_VERSION}/*.out expected/ 2>/dev/null || true) \
     # run tests
@@ -219,10 +196,9 @@ RUN set -e \
     && su - postgres -c "cd /${TARGET_DIR}; make installcheck" \
     # build extension in target dir for packaging
     && make install DESTDIR="${PKG_ROOT}" \
-    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" \
-    PG_CFLAGS="${CFLAGS} -Wno-vla" \
-    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
-    SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    BITCODE_CFLAGS="${CFLAGS} -Wno-vla" PG_CFLAGS="${CFLAGS} -Wno-vla" \
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" SHLIB_LINK="${LIBS} ${SYS_LIBS}" \
+    # build .deb package
     && rm -rf build \
     && mkdir -p ${PKG_ROOT}/DEBIAN \
     && PKG_SIZE=$(du -ks "${PKG_ROOT}" | cut -f1) \

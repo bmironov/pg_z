@@ -3,14 +3,14 @@
 set -e
 cd "$(dirname "$0")"
 SCRIPT_NAME=$(basename $0)
-source ./build-defaults.sh
+source ./build-common.sh
 mkdir -p "$TARGET_DIR"
 
 usage() {
     echo "Usage:"
-    echo "$SCRIPT_NAME [pg_z_version]"
+    echo "  $SCRIPT_NAME [pg_z_version]"
     echo "Where:"
-    echo "pg_z_version - (optional) latest, if not provided, or tag from git repository"
+    echo "  pg_z_version - (optional) latest, if not provided, or tag from git repository"
 }
 
 PG_Z_VERSION=$(get_pg_z_version "$1")

@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          
+
       - name: Compute Target Extension Version
         id: version-resolver
         run: |
@@ -114,13 +114,48 @@ jobs:
           archive: false
 
   # ==============================================================================
+  # COMPILING STATICALLY LINKED PG_Z AS REDHAT PACKAGES (.RPM)
+  # ==============================================================================
+  build-rpm:
+    if: false
+    name: Compile RPM Package
+    runs-on: ubuntu-latest
+    needs: init
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported Rocky LTS versions
+        os_version: [rocky8]
+        # Supported PostgreSQL versions
+        pg_version: [18]
+    steps:
+      - name: Checkout Source Code Tree
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx Context Engine
+        uses: docker/setup-buildx-action@v4
+
+      - name: Execute Unified RPM Compiler & Regression Test Harness
+        run: |
+          chmod +x ./build/build-rpm.sh
+          ./build/build-rpm.sh "${{ matrix.os_version }}" "${{ matrix.pg_version }}" "${{ needs.init.outputs.version }}"
+
+      - name: Stash Compiled .RPM Packages as Intermediate Workflow Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-pg_z-rpm-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
+          path: build/packages/*.rpm
+          retention-days: 1
+          archive: false
+
+  # ==============================================================================
   # UNIFIED RELEASER & ARTIFACT SHIPPER
   # ==============================================================================
   publish-release:
     if: false
     name: Publish Production GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-archives, build-deb]
+    needs: [build-archives, build-deb, build-rpm]
     permissions:
       contents: write
     steps:
@@ -144,6 +179,13 @@ jobs:
           path: dist-assets/
           merge-multiple: true
 
+      - name: Retrieve Stashed Compiled .RPM Packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-pg_z-rpm-*
+          path: dist-assets/
+          merge-multiple: true
+
       - name: Verify Extracted Release Asset Matrix
         run: |
           echo "=== The following artifacts are ready for deployment ==="
@@ -163,5 +205,6 @@ jobs:
             dist-assets/*.tar.gz
             dist-assets/*.zip
             dist-assets/*.deb
+            dist-assets/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
