@@ -6,8 +6,13 @@ AC_PROG_CC
 # Detect target operating system
 AC_CANONICAL_HOST
 is_debian=no
+is_rocky=no
 if test -f /etc/debian_version; then
     is_debian=yes
+fi
+
+if test -f /etc/redhat-release; then
+    is_rocky=yes
 fi
 
 AC_CHECK_LIB([m], [cos]) # Required for static linking of Brotli
@@ -80,6 +85,9 @@ AC_ARG_WITH([link-zstd],
 
 # Resolve smart defaults based on OS family
 AS_IF([test "x$is_debian" = "xyes"], [
+    SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+    LDFLAGS="-L$SYSTEM_LIB_DIR $LDFLAGS"
+
     AS_IF([test "x$is_package_build" != "xyes"], [
         case "$SNAPPY" in
             default) SNAPPY=dynamic ;;
@@ -94,8 +102,12 @@ AS_IF([test "x$is_debian" = "xyes"], [
     AS_IF([test "x$SNAPPY" = "xdefault"], [SNAPPY=static])
 ])
 
+AS_IF([test "x$is_rocky" = "xyes"], [
+    SYSTEM_LIB_DIR="/usr/lib64"
+    LDFLAGS="-L$SYSTEM_LIB_DIR -L/usr/lib $LDFLAGS"
+])
 
-SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+LIBS="$LIBS -lpthread -lm -lstdc++"
 
 # Variables to accumulate verified runtime libraries
 STATIC_LIBS=""
@@ -115,6 +127,7 @@ ALGOS=""
 # $4 function defined by library (eg, zng_deflate)
 AC_DEFUN([MY_CHECK_LIB], [
     AS_VAR_SET([HAVE_$1], [no])
+    saveLIBS="$LIBS"
     LIBS="-l$3 $LIBS"
 
     AS_IF([test "$MODE" = "static"], [
@@ -126,6 +139,7 @@ AC_DEFUN([MY_CHECK_LIB], [
             AS_VAR_SET([HAVE_$1], [yes])
         ], [
             AC_MSG_NOTICE([Library lib$3.a is missing. If its functionality is needed, install $1 development package.])
+            LIBS="$save_LIBS"
         ])
 
         LDFLAGS="$save_LDFLAGS"
@@ -135,6 +149,7 @@ AC_DEFUN([MY_CHECK_LIB], [
             AS_VAR_SET([HAVE_$1], [yes])
         ], [
             AC_MSG_NOTICE([Library lib$3.so is missing. If its functionality is needed, install $1 development package.])
+            LIBS="$save_LIBS"
         ])
     ])
 ])
@@ -222,6 +237,7 @@ fi
 # Export results
 AC_SUBST(DYNAMIC_LIBS)
 AC_SUBST(STATIC_LIBS)
+AC_SUBST(LIBS)
 AC_SUBST(COMPRESSION_CFLAGS)
 AC_SUBST(CONFIGURE_RUN)
 AC_SUBST([GIT_VERSION])
@@ -232,6 +248,7 @@ AC_MSG_NOTICE([GIT_VERSION:   $GIT_VERSION])
 AC_MSG_NOTICE([ALGO_LIST:     $ALGO_LIST])
 AC_MSG_NOTICE([STATIC_LIBS:   $STATIC_LIBS])
 AC_MSG_NOTICE([DYNAMIC_LIBS:  $DYNAMIC_LIBS])
+AC_MSG_NOTICE([LIBS:          $LIBS])
 AC_MSG_NOTICE([CFLAGS MACROS: $COMPRESSION_CFLAGS])
 AC_MSG_NOTICE([==================================================])
 

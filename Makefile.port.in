@@ -1,5 +1,6 @@
 # Variables replaced by configure script for dynamic linking
 STATIC_LIBS        = @STATIC_LIBS@
 DYNAMIC_LIBS       = @DYNAMIC_LIBS@
+SHLIB_LINK         = @STATIC_LIBS@ @DYNAMIC_LIBS@ -lpthread -lm -lstdc++
 CONFIGURE_RUN      = @CONFIGURE_RUN@
 export COMPRESSION_CFLAGS = @COMPRESSION_CFLAGS@

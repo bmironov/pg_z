@@ -35,6 +35,7 @@ export CONFIGURE_RUN
 export DATA
 
 
+$(info GIT_VERSION:     $(GIT_VERSION))
 $(info OBJS:            $(OBJS))
 $(info REGRESS:         $(REGRESS))
 $(info ACTIVE_ALGOS:    $(ACTIVE_ALGOS))

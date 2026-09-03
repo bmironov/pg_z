@@ -7,6 +7,8 @@
     * [Controlling Linking Type](#controlling-linking-type)
 - [Operating System Specific Constraints](#operating-system-specific-constraints)
     * [Debian and Ubuntu Distributions](#debian-and-ubuntu-distributions)
+    * [Package "Build" mode](#package-build-mode)
+- [Architectural Comparison: Static vs. Dynamic Linking](#architectural-comparison-static-vs-dynamic-linking)
 - [`gzip` / `deflate` Hardware Acceleration with `zlib-ng`](#gzip--deflate-hardware-acceleration-with-zlib-ng)
 - [Custom Extreme Optimization (Zero Runtime Dependencies)](#custom-extreme-optimization-zero-runtime-dependencies)
 - [Verification: Auditing the Compiled `pg_z.so` Binary](#verification-auditing-the-compiled-pg_zso-binary)
@@ -70,6 +72,39 @@ linked statically out of the box due to upstream packaging policies:
 
 The `configure` script automatically detects Debian/Ubuntu systems, adjusts
 the default linking behaviors safely, and blocks invalid manual configurations.
+
+### Package "Build" mode
+
+To activate this mode, pass the `--enable-package-build` option to the
+`configure` script.
+
+This mode bypasses default OS-specific linking constraints, allowing the
+compiler to generate a monolithic `pg_z.so` shared object with all selected
+compression libraries linked statically. This provides several production
+advantages:
+
+- It generates a self-sufficient extension binary that eliminates runtime
+  dependencies on system-level shared libraries (`.so`).
+- It allows decoupling the extension from aging upstream distribution packages
+  by compiling and embedding newer, optimized versions of the compression
+  libraries directly into the runtime binary.
+
+Once `--enable-package-build` is specified, you can explicitly configure the
+linking type for each individual library using the corresponding `--with-*-link`
+arguments.
+
+## Architectural Comparison: Static vs. Dynamic Linking
+
+The following matrix evaluates the trade-offs between linking mechanisms
+specifically for the `pg_z` extension context under Enterprise Linux (RHEL/Rocky
+Linux) and Debian/Ubuntu deployments:
+
+| Evaluation Criteria | Dynamic Linking (`-l*`) | Static Linking (`lib*.a`) |
+| :--- | :--- | :--- |
+| **Execution Hot-Path Performance** | Baseline. Nanosecond overhead via PLT/GOT indirection is completely negligible for a few block-level calls per query. | Marginal micro-optimization. Replaces indirect runtime jumps with direct call instructions. No practical impact on macro-benchmarks. |
+| **Upstream Library Versions** | Locked to default OS package manager repositories (e.g., legacy LZ4 v1.9.3 on Rocky 9). | **Bakes in cutting-edge versions** compiled from upstream source (e.g., LZ4 v1.10.0), unlocking internal algorithmic enhancements. |
+| **Binary Footprint (`pg_z.so`)** | Minimal (few Kilobytes). Relies on shared memory objects loaded into the OS runtime address space. | Increased footprint. Compiles the literal object code of all compression engines directly into the `pg_z. so`. |
+| **Dependency Management** | Requires maintaining runtime payload packages via strict `Requires:` definitions in `.spec` or `control`. | Total autonomy (`self-sufficient`). Zero external payload dependencies on the host OS layer during deployment. |
 
 ## `gzip` / `deflate` Hardware Acceleration with `zlib-ng`
 
