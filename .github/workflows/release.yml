@@ -4,7 +4,7 @@ name: New Version Release
 on:
   push:
     tags:
-      - '[0-9]+\.[0-9]+\.[0-9]+'
+      - '^[0-9]+\.[0-9]+\.[0-9]+$'
   workflow_dispatch:
     inputs:
       custom_version:
@@ -76,8 +76,8 @@ jobs:
         with:
           name: release-pg_z-archives
           path: |
-            packages/pg_z-*.tar.gz
-            packages/pg_z-*.zip
+            build/packages/pg_z-*.tar.gz
+            build/packages/pg_z-*.zip
 
   # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
@@ -91,9 +91,11 @@ jobs:
       fail-fast: false # Failure in one build won't stop others
       matrix:
         # Supported Debian and Ubuntu LTS versions
-        os_version: [bookworm, trixie, noble, jammy, resolute]
+        #os_version: [bookworm, trixie, noble, jammy, resolute]
+        os_version: [trixie]
         # Supported PostgreSQL versions
-        pg_version: [16, 17, 18]
+        #pg_version: [16, 17, 18]
+        pg_version: [18]
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
@@ -111,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-deb-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
-          path: packages/*.deb
+          path: build/packages/*.deb
           retention-days: 1
           archive: false
 
@@ -127,9 +129,11 @@ jobs:
       fail-fast: false
       matrix:
         # Supported Rocky LTS versions
-        os_version: [rocky8, rocky9, rocky10]
+        #os_version: [rocky8, rocky9, rocky10]
+        os_version: [rocky10]
         # Supported PostgreSQL versions
-        pg_version: [16, 17, 18]
+        #pg_version: [16, 17, 18]
+        pg_version: [18]
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
@@ -147,7 +151,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-rpm-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
-          path: packages/*.rpm
+          path: build/packages/*.rpm
           retention-days: 1
           archive: false
 
@@ -192,6 +196,8 @@ jobs:
       - name: Verify Extracted Release Asset Matrix
         run: |
           echo "=== The following artifacts are ready for deployment ==="
+          find dist-assets/ -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.zip" -o -name "*.tar.gz" \) -exec mv {} dist-assets/ \;
+          find dist-assets/ -mindepth 1 -type d -delete
           ls -la dist-assets
 
       - name: Deploy Production Release & Ship Verified Artifacts
