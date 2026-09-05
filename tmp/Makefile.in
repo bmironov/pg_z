@@ -17,7 +17,7 @@ $(error Please run ./configure before running make)
 endif
 
 
-ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(COMPRESSION_CFLAGS))
+ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(filter -DUSE_%,$(COMPRESSION_CFLAGS)))
 REGRESS += $(ACTIVE_ALGOS)
 OBJS = $(addsuffix .o, $(SRC_MODULES)) $(addsuffix .o, $(ACTIVE_ALGOS))
 
@@ -62,18 +62,26 @@ else
 	# lto - Link-Time Optimization
 	PG_CFLAGS += -march=native -flto
 	SHLIB_LINK += -flto
-	STRIP_CMD = strip --strip-unneeded $(shlib)
+	ifneq ($(STRIP),)
+		# Via "STRIP=:" in command line (eg, make STRIP=:)
+		# we can prevent this step
+		STRIP_CMD = true
+	else
+		# Debina-based or local build is fine to strip debug info
+		STRIP_CMD = strip --strip-unneeded $(shlib)
+	endif
 endif
 
 override PG_CFLAGS += $(COMPRESSION_CFLAGS)
 
 PG_LDFLAGS += -L/usr/lib/x86_64-linux-gnu
-SHLIB_LINK += -Wl,-Bstatic  -Wl,--start-group $(STATIC_LIBS) -Wl,--end-group \
-			  -Wl,-Bdynamic $(DYNAMIC_LIBS)
+SHLIB_LINK += -Bstatic $(STATIC_LIBS) -Bdynamic $(DYNAMIC_LIBS)
 
 $(info STATIC_LIBS:  $(STATIC_LIBS))
 $(info DYNAMIC_LIBS: $(DYNAMIC_LIBS))
 $(info PG_CFLAGS:    $(PG_CFLAGS))
+$(info SHLIB_LINK:   $(SHLIB_LINK))
+
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)

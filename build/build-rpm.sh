@@ -31,10 +31,12 @@ OS_FAMILY=$(get_redhat_os_family $OS_VERSION)
 check_pg_version "$PG_VERSION"
 OS_MIRROR=$(get_os_mirror $OS_FAMILY)
 ROCKY_MAJOR=$(get_rocky_major_version $OS_VERSION)
+ARCH_LEVEL=$(get_redhat_arch_level $OS_VERSION)
 REPO_COMPONENTS=$(get_repo_components $OS_FAMILY $OS_VERSION)
 
-DOCKER_TAG="postgresql${PG_VERSION}-pg-z:${PG_Z_VERSION}-1-el${ROCKY_MAJOR}"
-RPM_FILENAME=$(echo ${DOCKER_TAG} | tr ':' '_' | sed 's/$/.x86_64.rpm/')
+DOCKER_TAG="postgresql${PG_VERSION}-pg-z:${PG_Z_VERSION}-1.el${ROCKY_MAJOR}"
+ARCH=$(arch)
+RPM_FILENAME=$(echo ${DOCKER_TAG} | tr ':' '-' | sed "s/$/.${ARCH}.rpm/")
 rm -f "./${TARGET_DIR}/${RPM_FILENAME}"
 
 echo "=== Building and Exporting Statically Linked pg_z.rpm Package ==="
@@ -43,8 +45,9 @@ echo "PostgreSQL: v${PG_VERSION}"
 echo "Extension:  pg_z v${PG_Z_VERSION}"
 echo "Package:    ${RPM_FILENAME}"
 
-DOCKER_BUILDKIT=1 docker --debug build \
+DOCKER_BUILDKIT=1 docker build \
     --build-arg ROCKY_MAJOR="${ROCKY_MAJOR}" \
+    --build-arg ARCH_LEVEL="${ARCH_LEVEL}" \
     --build-arg REPO_COMPONENTS="${REPO_COMPONENTS}" \
     --build-arg PG_VERSION="${PG_VERSION}" \
     --build-arg PG_Z_VERSION="${PG_Z_VERSION}" \

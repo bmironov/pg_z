@@ -15,7 +15,6 @@ if test -f /etc/redhat-release; then
     is_rocky=yes
 fi
 
-AC_CHECK_LIB([m], [cos]) # Required for static linking of Brotli
 
 # ===========================================================================
 # COMMAND LINE ARGUMENTS & OPTIONS FOR --help
@@ -107,7 +106,6 @@ AS_IF([test "x$is_rocky" = "xyes"], [
     LDFLAGS="-L$SYSTEM_LIB_DIR -L/usr/lib $LDFLAGS"
 ])
 
-LIBS="$LIBS -lpthread -lm -lstdc++"
 
 # Variables to accumulate verified runtime libraries
 STATIC_LIBS=""
@@ -127,8 +125,6 @@ ALGOS=""
 # $4 function defined by library (eg, zng_deflate)
 AC_DEFUN([MY_CHECK_LIB], [
     AS_VAR_SET([HAVE_$1], [no])
-    saveLIBS="$LIBS"
-    LIBS="-l$3 $LIBS"
 
     AS_IF([test "$MODE" = "static"], [
         save_LDFLAGS="$LDFLAGS"
@@ -139,14 +135,16 @@ AC_DEFUN([MY_CHECK_LIB], [
             AS_VAR_SET([HAVE_$1], [yes])
         ], [
             AC_MSG_NOTICE([Library lib$3.a is missing. If its functionality is needed, install $1 development package.])
-            LIBS="$save_LIBS"
         ])
 
         LDFLAGS="$save_LDFLAGS"
     ], [
+        save_LIBS="$LIBS"
+        LIBS="-l$3 $LIBS"
         AC_CHECK_LIB([$3], [$4], [
             AS_VAR_APPEND([DYNAMIC_LIBS], [" -l$3"])
             AS_VAR_SET([HAVE_$1], [yes])
+            LIBS="$save_LIBS"
         ], [
             AC_MSG_NOTICE([Library lib$3.so is missing. If its functionality is needed, install $1 development package.])
             LIBS="$save_LIBS"
@@ -162,9 +160,17 @@ AC_DEFUN([MY_CHECK_LIB], [
 # --- Brotli ---
 AS_IF([test "x$with_brotli" = "xyes"], [
     MODE="$BROTLI"
-    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
+
+    AS_IF([test "$MODE" = "static"], [
+        AC_CHECK_LIB([m], [cos], [AS_VAR_APPEND([STATIC_LIBS], [" -lm"])])
+    ])
+
+    save_LIBS="$LIBS"
+    LIBS="$LIBS -lbrotlicommon"
     MY_CHECK_LIB([brotli_e], [libbrotli], [brotlienc],    [BrotliEncoderCreateInstance])
     MY_CHECK_LIB([brotli_d], [libbrotli], [brotlidec],    [BrotliDecoderCreateInstance])
+    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
+    LIBS="$save_LIBS"
     AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
         AS_VAR_APPEND([ALGOS], [" Brotli"])
@@ -172,16 +178,9 @@ AS_IF([test "x$with_brotli" = "xyes"], [
 ])
 
 # --- Gzip / Deflate ---
-# Process standard legacy Zlib engine
-AS_IF([test "x$with_gzip" = "xyes"], [
-    MODE="$ZLIB"
-    MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
-    AS_IF([test "x$HAVE_zlib" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
-        AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
-    ])
-])
-
+# ATTENTION! Due to possible collisions between object names
+# in zlib-ng and classical zlib it is required to process
+# zlib-ng BEFORE zlib otherwise linked will produce incorrect result
 # Process Zlib-NG engine
 AS_IF([test "x$with_gzip_ng" = "xyes"], [
     MODE="$ZLIB_NG"
@@ -189,6 +188,16 @@ AS_IF([test "x$with_gzip_ng" = "xyes"], [
     AS_IF([test "x$HAVE_zlib_ng" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
         AS_VAR_APPEND([ALGOS], [" Gzip-NG/Deflate-NG"])
+    ])
+])
+
+# Process standard legacy Zlib engine
+AS_IF([test "x$with_gzip" = "xyes"], [
+    MODE="$ZLIB"
+    MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
+    AS_IF([test "x$HAVE_zlib" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
+        AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
     ])
 ])
 
@@ -229,7 +238,7 @@ ALGO_LIST=$(echo "$ALGOS" | xargs | sed "s/ /, /g")
 if test -f VERSION; then
     GIT_VERSION=$(cat VERSION | tr -d '\n')
 elif test -d .git; then
-    GIT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null)
+    GIT_VERSION=$(git -c safe.directory='*' describe --tags --abbrev=0 2>/dev/null)
 else
     GIT_VERSION="0.0.1"
 fi

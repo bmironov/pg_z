@@ -55,7 +55,7 @@ jobs:
   # PACKAGING SOURCE ARCHIVES (.ZIP & .TAR.GZ)
   # ==============================================================================
   build-archives:
-    if: false
+    if: true
     name: Build Source Archives
     runs-on: ubuntu-latest
     needs: init
@@ -67,6 +67,7 @@ jobs:
 
       - name: Execute Autonomous Archive Packager
         run: |
+          chmod +x ./build/build-common.sh
           chmod +x ./build/build-zip.sh
           ./build/build-zip.sh "${{ needs.init.outputs.version }}"
 
@@ -75,14 +76,14 @@ jobs:
         with:
           name: release-pg_z-archives
           path: |
-            build/packages/pg_z-*.tar.gz
-            build/packages/pg_z-*.zip
+            packages/pg_z-*.tar.gz
+            packages/pg_z-*.zip
 
   # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
   # ==============================================================================
   build-deb:
-    if: false
+    if: true
     name: Compile Debian Package
     runs-on: ubuntu-latest
     needs: init
@@ -102,6 +103,7 @@ jobs:
 
       - name: Execute Unified Compiler & Regression Test Harness
         run: |
+          chmod +x ./build/build-common.sh
           chmod +x ./build/build-deb.sh
           ./build/build-deb.sh "${{ matrix.os_version }}" "${{ matrix.pg_version }}" "${{ needs.init.outputs.version }}"
 
@@ -109,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-deb-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
-          path: build/packages/*.deb
+          path: packages/*.deb
           retention-days: 1
           archive: false
 
@@ -117,7 +119,7 @@ jobs:
   # COMPILING STATICALLY LINKED PG_Z AS REDHAT PACKAGES (.RPM)
   # ==============================================================================
   build-rpm:
-    if: false
+    if: true
     name: Compile RPM Package
     runs-on: ubuntu-latest
     needs: init
@@ -125,9 +127,9 @@ jobs:
       fail-fast: false
       matrix:
         # Supported Rocky LTS versions
-        os_version: [rocky8]
+        os_version: [rocky8, rocky9, rocky10]
         # Supported PostgreSQL versions
-        pg_version: [18]
+        pg_version: [16, 17, 18]
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
@@ -137,6 +139,7 @@ jobs:
 
       - name: Execute Unified RPM Compiler & Regression Test Harness
         run: |
+          chmod +x ./build/build-common.sh
           chmod +x ./build/build-rpm.sh
           ./build/build-rpm.sh "${{ matrix.os_version }}" "${{ matrix.pg_version }}" "${{ needs.init.outputs.version }}"
 
@@ -144,7 +147,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-pg_z-rpm-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
-          path: build/packages/*.rpm
+          path: packages/*.rpm
           retention-days: 1
           archive: false
 
@@ -201,6 +204,20 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+          body: |
+            ## Release pg_z v${{ needs.init.outputs.version }}
+
+            ### Key Features
+            - **Statically Linked Dependencies**: All 6 compression algorithms
+              are statically linked inside every supplied package. This ensures
+              the usage of the latest compression library versions without
+              interfering with system-level dependencies.
+            - **Verified Stability**: Every published package has successfully
+              passed comprehensive end-to-end (E2E) regression testing during
+              the build phase.
+            - **Documentation**: For deployment guidelines and API usage,
+              please refer to the [README.md](https://github.com{{ github.repository }}/blob/main/README.md).
+
           files: |
             dist-assets/*.tar.gz
             dist-assets/*.zip

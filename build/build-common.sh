@@ -110,6 +110,26 @@ get_rocky_major_version() {
     echo $ROCKY_MAJOR
 }
 
+get_redhat_arch_level() {
+    local OS_VERSION=$1
+    local ROCKY_MAJOR=$(get_rocky_major_version $OS_VERSION)
+
+    case "$ROCKY_MAJOR" in
+    10)
+        echo "x86-64-v3"
+        ;;
+    9)
+        echo "x86-64-v2"
+        ;;
+    8)
+        echo "x86-64"
+        ;;
+    *)
+        echo "generic"
+        ;;
+    esac
+}
+
 check_pg_version() {
     local PG_VERSION=$1
 
