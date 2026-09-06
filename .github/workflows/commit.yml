@@ -48,7 +48,7 @@ jobs:
             pg_z:test /bin/bash -c "
               export PGDATA=/mnt/shared/db_cluster &&
               mkdir -p \$PGDATA && initdb -D \$PGDATA &&
-              pg_ctl start -D \$PGDATA -w &&
+              pg_ctl start -D \$PGDATA -l \$PGDATA/postgresql.log -w &&
               (PGUSER=postgres make installcheck || { cat tmp/regression.diffs; exit 1; }) &&
               pg_ctl stop -D \$PGDATA -m fast
             "
@@ -60,7 +60,7 @@ jobs:
             -v ${{ github.workspace }}/pgdata:/mnt/shared \
             pg_z:test /bin/bash -c "
               export PGDATA=/mnt/shared/db_cluster &&
-              pg_ctl start -D \$PGDATA -w &&
+              pg_ctl start -D \$PGDATA -l \$PGDATA/postgresql.log -w &&
               make benchmark &&
               pg_ctl stop -D \$PGDATA -m fast
             "
@@ -72,7 +72,7 @@ jobs:
             -v ${{ github.workspace }}/pgdata:/mnt/shared \
             pg_z:test /bin/bash -c "
               export PGDATA=/mnt/shared/db_cluster &&
-              pg_ctl start -D \$PGDATA -w &&
+              pg_ctl start -D \$PGDATA -l \$PGDATA/postgresql.log -w &&
               make load_test &&
               pg_ctl stop -D \$PGDATA -m fast
             "
