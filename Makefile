@@ -1,7 +1,7 @@
-ifneq ($(wildcard .git),)
-    GIT_VERSION := $(shell git -c safe.directory='*' describe --tags --abbrev=0 2>/dev/null)
-else ifneq ($(wildcard VERSION),)
+ifneq ($(wildcard VERSION),)
     GIT_VERSION := $(shell cat VERSION 2>/dev/null | tr -d '\n')
+else ifneq ($(wildcard .git),)
+    GIT_VERSION := $(shell git -c safe.directory='*' describe --tags --abbrev=0 2>/dev/null)
 endif
 
 GIT_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),0.0.1)
