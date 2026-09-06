@@ -54,7 +54,11 @@ USER postgres
 # Default configuration builds an "all-in" version
 # Users can override this step locally to pass specific configure flags
 # See documentation for details
-RUN autoreconf -if && ./configure && make clean && make
+RUN autoreconf -if && ./configure \
+    --with-link-brotli=dynamic   --with-link-gzip=dynamic \
+    --with-link-gzip-ng=dynamic  --with-link-lz4=dynamic \
+    --with-link-snappy=dynamic   --with-link-zstd=dynamic \
+    && make clean && make
 
 
 USER root
