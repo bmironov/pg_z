@@ -8,6 +8,14 @@ export ERR_NOT_ENOUGH_PARAMETERS=1
 export ERR_UNKNOWN_OS=2
 export ERR_UNKNOWN_PG=3
 
+# Compression libraries versions
+export BROTLI_VERSION="1.2.0"
+export LZ4_VERSION="1.10.0"
+export SNAPPY_VERSION="1.2.2"
+export ZLIB_VERSION="1.3.2"
+export ZLIB_NG_VERSION="2.3.3"
+export ZSTD_VERSION="1.5.7"
+
 export TARGET_DIR="packages"
 
 export OS_FAMILY_DEBIAN="debian"
@@ -31,14 +39,6 @@ IFS=', ' REDHAT_VERSIONS_LIST="${SUPPORTED_ROCKY_VERSIONS[*]}"
 SUPPORTED_PG_VERSIONS=("16" "17" "18")
 IFS='|' PG_VERSIONS_REGEX="^(${SUPPORTED_PG_VERSIONS[*]})$"
 IFS=', ' PG_VERSIONS_LIST="${SUPPORTED_PG_VERSIONS[*]}"
-
-# Compression libraries versions
-export BROTLI_VERSION="1.2.0"
-export LZ4_VERSION="1.10.0"
-export SNAPPY_VERSION="1.2.2"
-export ZLIB_VERSION="1.3.2"
-export ZLIB_NG_VERSION="2.3.3"
-export ZSTD_VERSION="1.5.7"
 
 get_pg_z_version() {
     local PG_Z_VERSION=$1

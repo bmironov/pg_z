@@ -74,7 +74,7 @@ jobs:
       - name: Stash Source Archives as Intermediate Workflow Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-pg_z-archives
+          name: pg_z-release-archives
           path: |
             build/packages/pg_z-*.tar.gz
             build/packages/pg_z-*.zip
@@ -91,11 +91,9 @@ jobs:
       fail-fast: false # Failure in one build won't stop others
       matrix:
         # Supported Debian and Ubuntu LTS versions
-        #os_version: [bookworm, trixie, noble, jammy, resolute]
-        os_version: [trixie]
+        os_version: [bookworm, trixie, noble, jammy, resolute]
         # Supported PostgreSQL versions
-        #pg_version: [16, 17, 18]
-        pg_version: [18]
+        pg_version: [16, 17, 18]
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
@@ -129,11 +127,10 @@ jobs:
       fail-fast: false
       matrix:
         # Supported Rocky LTS versions
-        #os_version: [rocky8, rocky9, rocky10]
-        os_version: [rocky10]
+        os_version: [rocky8, rocky9, rocky10]
         # Supported PostgreSQL versions
-        #pg_version: [16, 17, 18]
-        pg_version: [18]
+        pg_version: [16, 17, 18]
+
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
@@ -159,7 +156,7 @@ jobs:
   # UNIFIED RELEASER & ARTIFACT SHIPPER
   # ==============================================================================
   publish-release:
-    if: false
+    if: true
     name: Publish Production GitHub Release
     runs-on: ubuntu-latest
     needs: [build-archives, build-deb, build-rpm]
@@ -175,7 +172,7 @@ jobs:
       - name: Retrieve Stashed Source Archives
         uses: actions/download-artifact@v8
         with:
-          pattern: release-pg_z-archives
+          pattern: pg_z-release-archives
           path: dist-assets/
           merge-multiple: true
 
