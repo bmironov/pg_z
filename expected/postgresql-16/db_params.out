@@ -1,0 +1,129 @@
+CREATE EXTENSION pg_z;
+--
+-- pg_z.max_size
+--
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = -1;
+ERROR:  -1 B is outside the valid range for parameter "pg_z.max_size" (0 .. 1073741823)
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+SET pg_z.max_size = 0;
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 0
+(1 row)
+
+SET pg_z.max_size = 1000;
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 1000B
+(1 row)
+
+SET pg_z.max_size = '1GB';
+ERROR:  1073741824 B is outside the valid range for parameter "pg_z.max_size" (0 .. 1073741823)
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 1000B
+(1 row)
+
+SET pg_z.max_size = '2GB';
+ERROR:  invalid value for parameter "pg_z.max_size": "2GB"
+HINT:  Value exceeds integer range.
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 1000B
+(1 row)
+
+SET pg_z.max_size = '10GB';
+ERROR:  invalid value for parameter "pg_z.max_size": "10GB"
+HINT:  Value exceeds integer range.
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 1000B
+(1 row)
+
+RESET pg_z.max_size;
+SHOW pg_z.max_size;
+ pg_z.max_size 
+---------------
+ 256MB
+(1 row)
+
+--
+-- pg_z.mem_chunk_size
+--
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 256kB
+(1 row)
+
+SET pg_z.mem_chunk_size = '16kB';
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 16kB
+(1 row)
+
+SET pg_z.mem_chunk_size = 1;
+ERROR:  1 B is outside the valid range for parameter "pg_z.mem_chunk_size" (8192 .. 1073741824)
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 16kB
+(1 row)
+
+SET pg_z.mem_chunk_size = 10000;
+NOTICE:  pg_z.mem_chunk_size has been rounded up to 16384
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 16kB
+(1 row)
+
+SET pg_z.mem_chunk_size = '5kB';
+ERROR:  5120 B is outside the valid range for parameter "pg_z.mem_chunk_size" (8192 .. 1073741824)
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 16kB
+(1 row)
+
+SET pg_z.mem_chunk_size = '1GB';
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 1GB
+(1 row)
+
+SET pg_z.mem_chunk_size = '10GB';
+ERROR:  invalid value for parameter "pg_z.mem_chunk_size": "10GB"
+HINT:  Value exceeds integer range.
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 1GB
+(1 row)
+
+RESET pg_z.mem_chunk_size;
+SHOW pg_z.mem_chunk_size;
+ pg_z.mem_chunk_size 
+---------------------
+ 256kB
+(1 row)
+
+DROP EXTENSION pg_z;

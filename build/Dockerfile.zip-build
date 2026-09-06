@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1
+
+ARG TARGET_DIR
+ARG PG_Z_VERSION
+ARG ARCHIVE_NAME
+
+# ==============================================================================
+# MAIN COMPILATION STAGE
+# ==============================================================================
+FROM alpine:latest AS packaging-stage
+ARG TARGET_DIR
+ARG PG_Z_VERSION
+ARG ARCHIVE_NAME
+
+ENV TARGET="/${TARGET_DIR}/${ARCHIVE_NAME}"
+ENV TAR_GZ="${TARGET}.tar.gz"
+ENV ZIP="${TARGET}.zip"
+ENV SOURCE="/source"
+
+RUN apk add --no-cache zip \
+    && mkdir -p "/${TARGET_DIR}"
+
+WORKDIR "${SOURCE}"
+COPY . .
+RUN set -e \
+    && zip -q -r "${ZIP}" . -x "*.git*" -x "./${TARGET_DIR}/*" \
+    && tar -czf "${TAR_GZ}" --exclude=".git" --exclude="./${TARGET_DIR}" -C "${SOURCE}" .
+
+
+# ==============================================================================
+# PURE EXPORT STAGE
+# ==============================================================================
+FROM scratch AS export-stage
+ARG TARGET_DIR
+ARG ARCHIVE_NAME
+COPY --from=packaging-stage "/${TARGET_DIR}/${ARCHIVE_NAME}.tar.gz" /
+COPY --from=packaging-stage "/${TARGET_DIR}/${ARCHIVE_NAME}.zip" /

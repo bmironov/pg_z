@@ -1,0 +1,295 @@
+# syntax=docker/dockerfile:1
+
+ARG ROCKY_MAJOR
+
+# ==============================================================================
+# MAIN COMPILATION STAGE
+# ==============================================================================
+FROM rockylinux/rockylinux:${ROCKY_MAJOR}-ubi AS packaging-stage
+
+ARG ROCKY_MAJOR
+ARG ARCH_LEVEL
+ARG REPO_COMPONENTS
+ARG PG_VERSION
+ARG PG_Z_VERSION
+ARG TARGET_DIR
+ARG RPM_FILENAME
+
+ARG BROTLI_VERSION
+ARG LZ4_VERSION
+ARG SNAPPY_VERSION
+ARG ZLIB_VERSION
+ARG ZLIB_NG_VERSION
+ARG ZSTD_VERSION
+
+ENV EXTRA_GCC_FLAGS="-march=${ARCH_LEVEL}"
+ENV SOURCE_DIR="/source"
+ENV PGDATA="/var/lib/pgsql/data"
+
+ENV CFLAGS="-I/opt/include -pthread"
+ENV LDFLAGS="-B/opt/lib64/ -L/opt/lib64"
+ENV SYS_LDFLAGS="-L/usr/lib64 -L/usr/lib -pthread -static-libgcc -static-libstdc++"
+ENV LIBS=""
+ENV SYS_LIBS="-lpthread -lm -lstdc++"
+ENV ALGO_LIST=""
+ENV PATH="/usr/bin:/usr/sbin:${PATH}:/usr/pgsql-${PG_VERSION}/bin"
+
+
+# ==============================================================
+# VALIDATION PHASE
+# ==============================================================
+RUN set -e  && \
+    if [ -z "${ROCKY_MAJOR}" ] || [ -z "${ARCH_LEVEL}" ] \
+    || [ -z "${REPO_COMPONENTS}" ] \
+    || [ -z "${PG_VERSION}" ] || [ -z "${PG_Z_VERSION}" ] \
+    || [ -z "${TARGET_DIR}" ] || [ -z "${RPM_FILENAME}" ] \
+    || [ -z "${BROTLI_VERSION}" ] || [ -z "${LZ4_VERSION}" ] \
+    || [ -z "${SNAPPY_VERSION}" ] || [ -z "${ZLIB_VERSION}" ] \
+    || [ -z "${ZLIB_NG_VERSION}" ] || [ -z "${ZSTD_VERSION}" ]; then \
+    echo "=========================================================================" ; \
+    echo "🚨 CRITICAL CONFIGURATION ERROR: One or more build arguments are missing!"; \
+    echo "Ensure you are running the build via build-deb.sh which sources defaults.sh" ; \
+    echo "=========================================================================" ; \
+    exit 1; \
+    fi
+
+RUN dnf install -y epel-release \
+    && dnf config-manager --set-enabled "${REPO_COMPONENTS}" \
+    && dnf install -y wget git rsync \
+    cmake automake gcc gcc-c++ clang llvm llvm-devel coreutils-single rpm-build \
+    glibc-static libstdc++-static redhat-rpm-config chrpath
+
+
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-${ROCKY_MAJOR}-x86_64/pgdg-redhat-repo-latest.noarch.rpm \
+    && if [ "${ROCKY_MAJOR}" = "8" ]; then dnf -y module disable postgresql; fi \
+    && dnf install -y postgresql${PG_VERSION}-server postgresql${PG_VERSION}-devel
+
+
+# ==============================================================
+# BUILD STATIC LIBRARIES PHASE
+# ==============================================================
+RUN touch /opt/rocky_flags.txt \
+    && if [ "${ROCKY_MAJOR}" != "8" ]; then \
+    echo "$(rpm --eval '%{optflags}') -specs=/usr/lib/rpm/redhat/redhat-annobin-cc1" > /opt/rocky_flags.txt; \
+    fi 
+WORKDIR /opt/lib64
+
+# Compile Static Modern Brotli
+WORKDIR /opt/build/brotli
+RUN curl -L -O "https://github.com/google/brotli/archive/refs/tags/v${BROTLI_VERSION}.tar.gz" \
+    && tar -xzf v${BROTLI_VERSION}.tar.gz \
+    && cd brotli-${BROTLI_VERSION} \
+    && mkdir build && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_C_VISIBILITY_PRESET=default \
+    -DCMAKE_CXX_VISIBILITY_PRESET=default \
+    -DCMAKE_C_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_CXX_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_INSTALL_LIBDIR=lib64 \
+    -DCMAKE_INSTALL_PREFIX=/opt \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install . 
+ENV ALGO_LIST="${ALGO_LIST} Brotli"
+
+# Compile Static zlib-ng
+WORKDIR /opt/build/zlib-ng
+RUN curl -L -O "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" \
+    && tar -xzf "${ZLIB_NG_VERSION}.tar.gz" \
+    && cd "zlib-ng-${ZLIB_NG_VERSION}" \
+    && mkdir build && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DZLIB_COMPAT=OFF \
+    -DZLIB_ENABLE_TESTS=OFF \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_C_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_CXX_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_INSTALL_PREFIX=/opt \
+    -DCMAKE_INSTALL_LIBDIR=lib64 \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install . 
+ENV ALGO_LIST="${ALGO_LIST} Gzip-NG/Deflate-NG"
+
+# Compile Static Vanilla zlib
+WORKDIR /opt/build/zlib
+RUN curl -L -O "https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VERSION}.tar.gz" \
+    && tar -xzf v${ZLIB_VERSION}.tar.gz \
+    && cd zlib-${ZLIB_VERSION} \
+    && CFLAGS="-fPIC -O3 $(cat /opt/rocky_flags.txt) ${EXTRA_GCC_FLAGS}" ./configure --prefix=/opt --static \
+    && make -j$(nproc) \
+    && make install \
+    && mkdir -p /opt/lib64 && mv /opt/lib/libz.a /opt/lib64/
+ENV ALGO_LIST="${ALGO_LIST} Gzip/Deflate"
+
+# Compile Static Modern LZ4
+WORKDIR /opt/build/lz4
+RUN curl -L -O "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz" \
+    && tar -xzf v${LZ4_VERSION}.tar.gz \
+    && cd lz4-${LZ4_VERSION} \
+    && make -C lib clean \
+    && make -C lib install \
+    PREFIX=/opt \
+    INCLUDEDIR=/opt/include \
+    LIBDIR=/opt/lib64 \
+    CC="gcc -fPIC -g -O3 -DLZ4_API_VISIBILITY=1 -DLZ4F_PUBLISH_STATIC_FUNCTIONS \$(cat /opt/rocky_flags.txt) ${EXTRA_GCC_FLAGS}" \
+    # linker gives priority to .so, therefore removing it
+    && rm -f /opt/lib64/liblz4.so*
+ENV ALGO_LIST="${ALGO_LIST} Lz4"
+
+# Compile Static Modern Snappy
+WORKDIR /opt/build/snappy
+RUN curl -L -O "https://github.com/google/snappy/archive/refs/tags/${SNAPPY_VERSION}.tar.gz" \
+    && tar -xzf "${SNAPPY_VERSION}.tar.gz" \
+    && cd snappy-${SNAPPY_VERSION} \
+    && mkdir build && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DCMAKE_C_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_CXX_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_INSTALL_PREFIX=/opt \
+    -DCMAKE_INSTALL_LIBDIR=lib64 \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+ENV ALGO_LIST="${ALGO_LIST} Snappy"
+
+# Compile Static Modern Zstandard
+WORKDIR /opt/build/zstd
+RUN curl -L -O "https://github.com/facebook/zstd/archive/refs/tags/v${ZSTD_VERSION}.tar.gz" \
+    && tar -xzf v${ZSTD_VERSION}.tar.gz \
+    && cd zstd-${ZSTD_VERSION}/build/cmake \
+    && mkdir build && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DZSTD_BUILD_SHARED=OFF \
+    -DZSTD_BUILD_STATIC=ON \
+    -DCMAKE_C_VISIBILITY_PRESET=default \
+    -DCMAKE_CXX_VISIBILITY_PRESET=default \
+    -DCMAKE_C_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_CXX_FLAGS="${EXTRA_GCC_FLAGS} $(cat /opt/rocky_flags.txt)" \
+    -DCMAKE_INSTALL_PREFIX=/opt \
+    -DCMAKE_INSTALL_LIBDIR=lib64 \
+    && cmake --build . --parallel $(nproc) && cmake --install .
+ENV ALGO_LIST="${ALGO_LIST} Zstd"
+
+
+# ==============================================================
+# BUILD POSTGRESQL EXTENSION PHASE
+# ==============================================================
+WORKDIR "${SOURCE_DIR}"
+COPY . .
+
+RUN set -e \
+    && echo "${PG_Z_VERSION}" > VERSION \
+    && autoreconf -ifv --install --force \
+    && for f in install-sh config.sub config.guess; do cp "$(find /usr/share -name "$f" | head -n 1)" .; done \
+    # configure environment
+    && export CFLAGS="${CFLAGS} -Wno-vla" \
+    && export LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS}" \
+    && export LIBS="${SYS_LIBS}" \
+    && ./configure \
+    CPPFLAGS="" \
+    --prefix=/usr                --enable-package-build \
+    --with-link-brotli=static    --with-link-gzip=static \
+    --with-link-gzip-ng=static   --with-link-lz4=static \
+    --with-link-snappy=static    --with-link-zstd=static \
+    # build extension
+    && make NOLTO=1 STRIP=: \
+    COPT="${EXTRA_GCC_FLAGS} -fcf-protection=full" \
+    PG_CPPFLAGS="${CFLAGS}" \
+    PG_CFLAGS="-U_FORTIFY_SOURCE" \
+    PG_LDFLAGS="${LDFLAGS} -Wl,-z,now -Wl,-z,cet-report=none -Wl,-Bsymbolic" \
+    SHLIB_LINK="-Bstatic -Wl,--whole-archive \$(STATIC_LIBS) -Wl,--no-whole-archive -Bdynamic \$(SYS_LIBS)"
+
+# ==============================================================
+# BUILD RPM PACKAGE PHASE
+# ==============================================================
+WORKDIR "/${TARGET_DIR}"
+# build .rpm package
+RUN mkdir -p {SPECS,SOURCES,BUILD,RPMS,SRPMS} \
+    && set -e \
+    && ALGO_LIST=$(echo "${ALGO_LIST}" | xargs | sed 's/ /, /g') \
+    && CURRENT_DATE=$(LC_ALL=C date "+%a %b %d %Y") \
+    && cat <<EOF > SPECS/pg_z.spec
+%define debug_package %{nil}
+
+Name:           postgresql${PG_VERSION}-pg-z
+Version:        ${PG_Z_VERSION}
+Release:        1%{?dist}
+Summary:        PostgreSQL v${PG_VERSION} extension pg_z v${PG_Z_VERSION}
+License:        PostgreSQL
+URL:            https://github.com/bmironov/pg_z
+AutoReqProv:    no
+Requires:       postgresql${PG_VERSION}-server
+
+%description
+This extension provides userspace functions to compress / decompress data via many modern algorithms: ${ALGO_LIST}.
+This package is compiled statically for Rocky Linux ${ROCKY_MAJOR}.
+
+%layout
+%inline
+
+%install
+mkdir -p %{buildroot}
+cd ${SOURCE_DIR}
+make install DESTDIR=%{buildroot} NOLTO=1 STRIP=: \
+    COPT="${EXTRA_GCC_FLAGS} -fcf-protection=full" \
+    PG_CPPFLAGS="${CFLAGS}" \
+    PG_CFLAGS="-U_FORTIFY_SOURCE" \
+    PG_LDFLAGS="${LDFLAGS} -Wl,-z,now -Wl,-z,cet-report=none -Wl,-Bsymbolic" \
+    SHLIB_LINK="-Bstatic -Wl,--whole-archive \$\$(STATIC_LIBS) -Wl,--no-whole-archive -Bdynamic \$\$(SYS_LIBS)"
+
+strip --strip-unneeded %{buildroot}/usr/pgsql-${PG_VERSION}/lib/pg_z.so
+chrpath --delete %{buildroot}/usr/pgsql-${PG_VERSION}/lib/pg_z.so
+
+%files
+%defattr(-,root,root,-)
+/usr/pgsql-${PG_VERSION}/lib/pg_z.so
+/usr/pgsql-${PG_VERSION}/share/extension/pg_z--*.sql
+/usr/pgsql-${PG_VERSION}/share/extension/pg_z.control
+/usr/pgsql-${PG_VERSION}/lib/bitcode/pg_z*.bc
+/usr/pgsql-${PG_VERSION}/lib/bitcode/pg_z/*.bc
+
+%changelog
+* ${CURRENT_DATE} BuildKit Robot <release@internal> - ${PG_Z_VERSION}-1
+- Automated E2E release build for Rocky Linux ${ROCKY_MAJOR}
+EOF
+
+# Build and install .rpm package
+RUN rpmbuild --define "_topdir /${TARGET_DIR}" -bb SPECS/pg_z.spec \
+    && dnf install -y "RPMS/$(arch)/${RPM_FILENAME}" \
+    && chown -R postgres:postgres ${SOURCE_DIR} \
+    && mkdir -p $PGDATA \
+    && chown postgres:postgres $PGDATA
+
+# ==============================================================
+# TEST NEWLY BUILT RPM PACKAGE PHASE
+# ==============================================================
+USER postgres
+WORKDIR ${SOURCE_DIR}
+RUN set +e \
+    # override default expected results with PG version specific outputs
+    && ([ -d expected/postgresql-${PG_VERSION} ] && cp expected/postgresql-${PG_VERSION}/*.out expected/ 2>/dev/null || true) \
+    # start DB and run tests
+    && initdb -D ${PGDATA} \
+    && pg_ctl -D ${PGDATA} -l ${PGDATA}/logfile start \
+    && make installcheck \
+    && pg_ctl -D ${PGDATA} stop
+
+USER root
+
+# ==============================================================================
+# PURE EXPORT STAGE
+# ==============================================================================
+FROM scratch AS export-stage
+ARG TARGET_DIR
+ARG RPM_FILENAME
+COPY --from=packaging-stage "/${TARGET_DIR}/RPMS/*/${RPM_FILENAME}" /
+
