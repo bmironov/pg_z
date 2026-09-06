@@ -6,16 +6,25 @@ AC_PROG_CC
 # Detect target operating system
 AC_CANONICAL_HOST
 is_debian=no
+is_rocky=no
 if test -f /etc/debian_version; then
     is_debian=yes
 fi
 
-AC_CHECK_LIB([m], [cos]) # Required for static linking of Brotli
+if test -f /etc/redhat-release; then
+    is_rocky=yes
+fi
+
 
 # ===========================================================================
 # COMMAND LINE ARGUMENTS & OPTIONS FOR --help
 # ===========================================================================
 
+AC_ARG_ENABLE([package-build],
+    [AS_HELP_STRING([--enable-package-build], [Enable total static compilation context for automated package builders])],
+    [is_package_build=$enableval],
+    [is_package_build=no]
+)
 # Enable/Disable specific compression algorithms (default: yes)
 AC_ARG_WITH([brotli],
             [AS_HELP_STRING([--with-brotli],  [include Brotli support (yes/no) [default=yes]])],
@@ -75,20 +84,28 @@ AC_ARG_WITH([link-zstd],
 
 # Resolve smart defaults based on OS family
 AS_IF([test "x$is_debian" = "xyes"], [
-    case "$SNAPPY" in
-        default) SNAPPY=dynamic ;;
-        static)  AC_MSG_ERROR([Snappy can only be linked dynamically on Debian/Ubuntu due to missing static archives. Please use --with-link-snappy=dynamic]) ;;
-    esac
-    case "$ZLIB" in
-        default) ZLIB=dynamic ;;
-        static) AC_MSG_ERROR([Standard zlib can only be linked dynamically on Debian/Ubuntu due to missing -fPIC. Please use --with-link-gzip=dynamic]) ;;
-    esac
+    SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+    LDFLAGS="-L$SYSTEM_LIB_DIR $LDFLAGS"
+
+    AS_IF([test "x$is_package_build" != "xyes"], [
+        case "$SNAPPY" in
+            default) SNAPPY=dynamic ;;
+            static)  AC_MSG_ERROR([Snappy can only be linked dynamically on Debian/Ubuntu due to missing static archives. Please use --with-link-snappy=dynamic]) ;;
+        esac
+        case "$ZLIB" in
+            default) ZLIB=dynamic ;;
+            static) AC_MSG_ERROR([Standard zlib can only be linked dynamically on Debian/Ubuntu due to missing -fPIC. Please use --with-link-gzip=dynamic]) ;;
+        esac
+    ])
 ], [
     AS_IF([test "x$SNAPPY" = "xdefault"], [SNAPPY=static])
 ])
 
+AS_IF([test "x$is_rocky" = "xyes"], [
+    SYSTEM_LIB_DIR="/usr/lib64"
+    LDFLAGS="-L$SYSTEM_LIB_DIR -L/usr/lib $LDFLAGS"
+])
 
-SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
 
 # Variables to accumulate verified runtime libraries
 STATIC_LIBS=""
@@ -108,7 +125,6 @@ ALGOS=""
 # $4 function defined by library (eg, zng_deflate)
 AC_DEFUN([MY_CHECK_LIB], [
     AS_VAR_SET([HAVE_$1], [no])
-    LIBS="-l$3 $LIBS"
 
     AS_IF([test "$MODE" = "static"], [
         save_LDFLAGS="$LDFLAGS"
@@ -123,11 +139,15 @@ AC_DEFUN([MY_CHECK_LIB], [
 
         LDFLAGS="$save_LDFLAGS"
     ], [
+        save_LIBS="$LIBS"
+        LIBS="-l$3 $LIBS"
         AC_CHECK_LIB([$3], [$4], [
             AS_VAR_APPEND([DYNAMIC_LIBS], [" -l$3"])
             AS_VAR_SET([HAVE_$1], [yes])
+            LIBS="$save_LIBS"
         ], [
             AC_MSG_NOTICE([Library lib$3.so is missing. If its functionality is needed, install $1 development package.])
+            LIBS="$save_LIBS"
         ])
     ])
 ])
@@ -140,9 +160,17 @@ AC_DEFUN([MY_CHECK_LIB], [
 # --- Brotli ---
 AS_IF([test "x$with_brotli" = "xyes"], [
     MODE="$BROTLI"
-    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
+
+    AS_IF([test "$MODE" = "static"], [
+        AC_CHECK_LIB([m], [cos], [AS_VAR_APPEND([STATIC_LIBS], [" -lm"])])
+    ])
+
+    save_LIBS="$LIBS"
+    LIBS="$LIBS -lbrotlicommon"
     MY_CHECK_LIB([brotli_e], [libbrotli], [brotlienc],    [BrotliEncoderCreateInstance])
     MY_CHECK_LIB([brotli_d], [libbrotli], [brotlidec],    [BrotliDecoderCreateInstance])
+    MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
+    LIBS="$save_LIBS"
     AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
         AS_VAR_APPEND([ALGOS], [" Brotli"])
@@ -150,16 +178,9 @@ AS_IF([test "x$with_brotli" = "xyes"], [
 ])
 
 # --- Gzip / Deflate ---
-# Process standard legacy Zlib engine
-AS_IF([test "x$with_gzip" = "xyes"], [
-    MODE="$ZLIB"
-    MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
-    AS_IF([test "x$HAVE_zlib" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
-        AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
-    ])
-])
-
+# ATTENTION! Due to possible collisions between object names
+# in zlib-ng and classical zlib it is required to process
+# zlib-ng BEFORE zlib otherwise linked will produce incorrect result
 # Process Zlib-NG engine
 AS_IF([test "x$with_gzip_ng" = "xyes"], [
     MODE="$ZLIB_NG"
@@ -167,6 +188,16 @@ AS_IF([test "x$with_gzip_ng" = "xyes"], [
     AS_IF([test "x$HAVE_zlib_ng" = "xyes"], [
         AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
         AS_VAR_APPEND([ALGOS], [" Gzip-NG/Deflate-NG"])
+    ])
+])
+
+# Process standard legacy Zlib engine
+AS_IF([test "x$with_gzip" = "xyes"], [
+    MODE="$ZLIB"
+    MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
+    AS_IF([test "x$HAVE_zlib" = "xyes"], [
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
+        AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
     ])
 ])
 
@@ -207,7 +238,7 @@ ALGO_LIST=$(echo "$ALGOS" | xargs | sed "s/ /, /g")
 if test -f VERSION; then
     GIT_VERSION=$(cat VERSION | tr -d '\n')
 elif test -d .git; then
-    GIT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null)
+    GIT_VERSION=$(git -c safe.directory='*' describe --tags --abbrev=0 2>/dev/null)
 else
     GIT_VERSION="0.0.1"
 fi
@@ -215,6 +246,7 @@ fi
 # Export results
 AC_SUBST(DYNAMIC_LIBS)
 AC_SUBST(STATIC_LIBS)
+AC_SUBST(LIBS)
 AC_SUBST(COMPRESSION_CFLAGS)
 AC_SUBST(CONFIGURE_RUN)
 AC_SUBST([GIT_VERSION])
@@ -225,6 +257,7 @@ AC_MSG_NOTICE([GIT_VERSION:   $GIT_VERSION])
 AC_MSG_NOTICE([ALGO_LIST:     $ALGO_LIST])
 AC_MSG_NOTICE([STATIC_LIBS:   $STATIC_LIBS])
 AC_MSG_NOTICE([DYNAMIC_LIBS:  $DYNAMIC_LIBS])
+AC_MSG_NOTICE([LIBS:          $LIBS])
 AC_MSG_NOTICE([CFLAGS MACROS: $COMPRESSION_CFLAGS])
 AC_MSG_NOTICE([==================================================])
 

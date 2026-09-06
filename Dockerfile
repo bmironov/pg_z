@@ -33,6 +33,7 @@ RUN wget https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}
     && cd /build/zlib-ng/build \
     && cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
+    -DZLIB_ENABLE_TESTS=OFF \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng \
     && cmake --build . --parallel $(nproc) \
@@ -47,7 +48,7 @@ ENV LD_LIBRARY_PATH=$LIBRARY_PATH
 WORKDIR /build/pg_z
 RUN chown -R postgres:postgres /build/pg_z
 COPY --chown=postgres:postgres . .
-RUN echo "Content of VERSION:" && cat VERSION 
+RUN echo "Content of VERSION:" && (cat VERSION || true)
 USER postgres
 
 # Default configuration builds an "all-in" version
