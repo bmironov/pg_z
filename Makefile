@@ -35,16 +35,29 @@ export BENCHMARK_ALGOS
 SUBDIRS = tmp
 
 
-.PHONY: all benchmark load_test debug install installcheck clean distclean
+.PHONY: all benchmark load_test debug install installcheck clean distclean generate-sql
 
 all:
 	$(MAKE) -C $(SUBDIRS) -f Makefile
+	$(MAKE) generate-sql
 
 debug:
 	$(MAKE) -C $(SUBDIRS) -f Makefile DEBUG_BUILD=1
+	$(MAKE) generate-sql
+	@if [ -f $(SUBDIRS)/pg_z.so ]; then \
+		echo "=== Saving debug build to pg_z.so.debug ==="; \
+		cp -f $(SUBDIRS)/pg_z.so $(SUBDIRS)/pg_z.so.debug; \
+	fi
 
 install:
 	$(MAKE) -C $(SUBDIRS) -f Makefile install
+	@if [ -f $(SUBDIRS)/pg_z.so.debug ]; then \
+		echo "=== [DEBUG] Restoring debug symbols over installed library ==="; \
+		TARGET_DIR="$(DESTDIR)`pg_config --pkglibdir`"; \
+		echo "=== Target directory: $$TARGET_DIR ==="; \
+		mkdir -p "$$TARGET_DIR"; \
+		cp -f $(SUBDIRS)/pg_z.so.debug "$$TARGET_DIR/pg_z.so"; \
+	fi
 
 installcheck:
 	$(MAKE) -C $(SUBDIRS) -f Makefile installcheck
@@ -57,9 +70,19 @@ load_test: all
 
 clean:
 	-$(MAKE) -C $(SUBDIRS) -f Makefile clean 2>/dev/null || true
-	rm -f pg_z--*.sql
+	rm -f pg_z--*.sql $(SUBDIRS)/pg_z.so.debug
 
 distclean:
 	-$(MAKE) -C $(SUBDIRS) -f Makefile distclean 2>/dev/null || true
 	rm -rf Makefile.port config.log config.status autom4te.cache
-	rm -f $(SUBDIRS)/Makefile $(SUBDIRS)/Makefile.port
+	rm -f $(SUBDIRS)/Makefile $(SUBDIRS)/Makefile.port $(SUBDIRS)/pg_z.so.debug
+
+strip-debug-info:
+	echo "=== Stripping out debug info from .so ==="
+	@if [ -f $(SUBDIRS)/pg_z.so ]; then \
+		strip --strip-unneeded $(SUBDIRS)/pg_z.so; \
+	fi
+
+generate-sql:
+	@echo "=== Generating SQL extension file ==="
+	@build/generate_sql.sh .
