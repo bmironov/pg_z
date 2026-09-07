@@ -53,6 +53,7 @@ extern size_t max_uncompressed_size;
  */
 
 Datum pg_z_version(PG_FUNCTION_ARGS);
+Datum pg_z_version_num(PG_FUNCTION_ARGS);
 
 /*
  * ===============================================================

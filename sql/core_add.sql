@@ -10,3 +10,14 @@ CREATE OR REPLACE FUNCTION pg_z_version()
     IMMUTABLE STRICT
     PARALLEL SAFE;
 
+--
+-- pg_z_vresion()
+--
+
+CREATE OR REPLACE FUNCTION pg_z_version_num()
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'pg_z_version_num'
+    LANGUAGE 'c'
+    IMMUTABLE STRICT
+    PARALLEL SAFE;
+

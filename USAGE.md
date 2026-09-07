@@ -6,6 +6,9 @@
     * [`pg_z_vresion`](#pg_z_vresion)
         + [`pg_z_vresion` Description](#pg_z_vresion-description)
         + [`pg_z_vresion` Examples](#pg_z_vresion-examples)
+    * [`pg_z_version_num`](#pg_z_version_num)
+        + [`pg_z_vresion_num` Description](#pg_z_vresion_num-description)
+        + [`pg_z_version_num` Examples](#pg_z_version_num-examples)
 - [Brotli Algorithm](#brotli-algorithm)
     * [`brotli`](#brotli)
         + [`brotli` Description](#brotli-description)
@@ -106,6 +109,36 @@ postgres=# SELECT pg_z_version();
 This output dynamically adjusts based on your build configuration, providing a
 reliable method for database administrators or migration scripts to verify
 available compression capabilities on the fly.
+
+### `pg_z_version_num`
+
+```text
+pg_z_version_num() → integer
+```
+
+#### `pg_z_vresion_num` Description
+
+The `pg_z_version_num()` function returns the extension version as an integer
+encoded with the following bit mask:
+
+- Bits 16 - 30: Major version number
+- Bits 8 - 15: Minor version number
+- Bits 0 - 7: Patch level
+
+For example, version `1.2.3` is returned as the hexadecimal value `0x010203`.
+
+This function is `IMMUTABLE`, `STRICT`, and `PARALLEL SAFE`, allowing the
+PostgreSQL query planner to optimize execution across parallel worker paths.
+
+#### `pg_z_version_num` Examples
+
+```sql
+postgres=# SELECT to_hex(pg_z_version_num());
+ to_hex
+--------
+ 10001
+(1 row)
+```
 
 ***
 

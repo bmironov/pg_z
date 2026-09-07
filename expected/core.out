@@ -8,4 +8,13 @@ SELECT pg_z_version();
  pg_z v1.0.1 (compiled with: brotli, gzip, deflate, gzip-ng, deflate-ng, lz4, snappy, zstd)
 (1 row)
 
+--
+-- pg_z_vresion_num
+--
+SELECT to_hex(pg_z_version_num());
+ to_hex 
+--------
+ 10001
+(1 row)
+
 DROP EXTENSION pg_z;
