@@ -28,6 +28,7 @@ jobs:
       - name: Checkout Repository Tree for Tag Discovery
         uses: actions/checkout@v5
         with:
+          ref: ${{ github.event.inputs.custom_version || github.ref }}
           fetch-depth: 0
 
       - name: Compute Target Extension Version
@@ -52,34 +53,6 @@ jobs:
           echo "Pipeline version initialized: v${VERSION}"
 
   # ==============================================================================
-  # PACKAGING SOURCE ARCHIVES (.ZIP & .TAR.GZ)
-  # ==============================================================================
-  build-archives:
-    if: true
-    name: Build Source Archives
-    runs-on: ubuntu-latest
-    needs: init
-    steps:
-      - name: Checkout Source Code Tree
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Execute Autonomous Archive Packager
-        run: |
-          chmod +x ./build/build-common.sh
-          chmod +x ./build/build-zip.sh
-          ./build/build-zip.sh "${{ needs.init.outputs.version }}"
-
-      - name: Stash Source Archives as Intermediate Workflow Artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: pg_z-release-archives
-          path: |
-            build/packages/pg_z-*.tar.gz
-            build/packages/pg_z-*.zip
-
-  # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
   # ==============================================================================
   build-deb:
@@ -89,6 +62,7 @@ jobs:
     needs: init
     strategy:
       fail-fast: false # Failure in one build won't stop others
+      max-parallel: 3
       matrix:
         # Supported Debian and Ubuntu LTS versions
         os_version: [bookworm, trixie, noble, jammy, resolute]
@@ -97,6 +71,8 @@ jobs:
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.init.outputs.version }}
 
       - name: Set up Docker Buildx Context Engine
         uses: docker/setup-buildx-action@v4
@@ -110,7 +86,6 @@ jobs:
       - name: Stash Compiled .DEB Packages as Intermediate Workflow Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-pg_z-deb-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
           path: build/packages/*.deb
           retention-days: 1
           archive: false
@@ -125,6 +100,7 @@ jobs:
     needs: init
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         # Supported Rocky LTS versions
         os_version: [rocky8, rocky9, rocky10]
@@ -134,6 +110,8 @@ jobs:
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.init.outputs.version }}
 
       - name: Set up Docker Buildx Context Engine
         uses: docker/setup-buildx-action@v4
@@ -147,7 +125,6 @@ jobs:
       - name: Stash Compiled .RPM Packages as Intermediate Workflow Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-pg_z-rpm-${{ matrix.os_version }}-pg${{ matrix.pg_version }}
           path: build/packages/*.rpm
           retention-days: 1
           archive: false
@@ -159,72 +136,77 @@ jobs:
     if: true
     name: Publish Production GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-archives, build-deb, build-rpm]
+    needs: [init, build-deb, build-rpm]
     permissions:
       contents: write
     steps:
       - name: Checkout Repository Context
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.init.outputs.version }}
 
       - name: Create Local Artifact Staging Workspace
         run: mkdir -p dist-assets/
 
-      - name: Retrieve Stashed Source Archives
+      - name: Retrieve Stashed Artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: pg_z-release-archives
-          path: dist-assets/
-          merge-multiple: true
-
-      - name: Retrieve Stashed Compiled .DEB Packages
-        uses: actions/download-artifact@v8
-        with:
-          pattern: release-pg_z-deb-*
-          path: dist-assets/
-          merge-multiple: true
-
-      - name: Retrieve Stashed Compiled .RPM Packages
-        uses: actions/download-artifact@v8
-        with:
-          pattern: release-pg_z-rpm-*
           path: dist-assets/
           merge-multiple: true
 
       - name: Verify Extracted Release Asset Matrix
         run: |
-          echo "=== The following artifacts are ready for deployment ==="
-          find dist-assets/ -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.zip" -o -name "*.tar.gz" \) -exec mv {} dist-assets/ \;
-          find dist-assets/ -mindepth 1 -type d -delete
-          ls -la dist-assets
+          echo "=== Extracting stashed zip archives ==="
+          ls -la dist-assets/
+
+      - name: Generate SHA-256 Checksums for All Artifacts
+        run: |
+          echo "=== Generating SHA-256 hashes ==="
+          cd dist-assets/
+          find . -maxdepth 1 -type f ! -name "checksums.txt" -print0 | xargs -0 -r sha256sum > checksums.txt
+          if [ ! -s "checksums.txt" ]; then
+            echo "❌ Error: No target packages found in staging workspace! Aborting release."
+            exit 1
+          fi
+          echo "=== Centralized Checksums Manifest ==="
+          cat checksums.txt
 
       - name: Deploy Production Release & Ship Verified Artifacts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.init.outputs.version }}
-          name: "Release pg_z v${{ needs.init.outputs.version }}"
+          name: "v${{ needs.init.outputs.version }}"
           # Automatically analyze commits between previous and current tags
           # and generates list of changes
           generate_release_notes: true
           draft: false
           prerelease: false
-          body: |
-            ## Release pg_z v${{ needs.init.outputs.version }}
+          body: >
+            ## pg_z Key Features:
 
-            ### Key Features
-            - **Statically Linked Dependencies**: All 6 compression algorithms
-              are statically linked inside every supplied package. This ensures
-              the usage of the latest compression library versions without
-              interfering with system-level dependencies.
+
+            - **Statically Linked Dependencies**: All compression algorithms
+            are statically linked inside every supplied package. This ensures
+            the usage of the latest compression library versions without
+            interfering with system-level dependencies.
+
+
             - **Verified Stability**: Every published package has successfully
-              passed comprehensive end-to-end (E2E) regression testing during
-              the build phase.
-            - **Documentation**: For deployment guidelines and API usage,
-              please refer to the [README.md](https://github.com{{ github.repository }}/blob/main/README.md).
+            passed comprehensive end-to-end (E2E) regression testing during
+            the build phase.
 
-          files: |
-            dist-assets/*.tar.gz
-            dist-assets/*.zip
-            dist-assets/*.deb
-            dist-assets/*.rpm
+
+            - **Documentation**: For deployment guidelines and API usage,
+            please refer to the
+            [README.md](https://github.com/bmironov/pg_z/blob/master/README.md).
+
+          files: dist-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Purge Temporary Intermediate Workflow Artifacts
+        uses: geekyeggo/delete-artifact@v6
+        with:
+          name: |
+            artifact
+          useGlob: true
