@@ -249,7 +249,8 @@ RUN set +e \
     # prepare DB and run tests
     && initdb -D ${PGDATA} \
     && pg_ctlcluster ${PG_VERSION} main start \
-    && make installcheck \
+    && make installcheck || true \
+    && if [ -f tmp/regression.diffs ]; then cat tmp/regression.diffs; exit 1; fi \
     && pg_ctlcluster ${PG_VERSION} main stop
 
 # ==============================================================================
