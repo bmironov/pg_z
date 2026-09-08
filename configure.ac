@@ -113,6 +113,13 @@ DYNAMIC_LIBS=""
 COMPRESSION_CFLAGS=""
 ALGOS=""
 
+SUPPORT_BROTLI="--"
+SUPPORT_GZIP="--"
+SUPPORT_GZIP_NG="--"
+SUPPORT_LZ4="--"
+SUPPORT_SNAPPY="--"
+SUPPORT_ZSTD="--"
+
 # ===========================================================================
 # REUSABLE MACROS FOR LIBRARY DETECTION
 # ===========================================================================
@@ -172,8 +179,11 @@ AS_IF([test "x$with_brotli" = "xyes"], [
     MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
     LIBS="$save_LIBS"
     AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli"])
+        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_brotli -DBROTLI_LINK_TYPE=\\\"$MODE\\\""])
         AS_VAR_APPEND([ALGOS], [" Brotli"])
+        SUPPORT_BROTLI=""
+    ], [
+        AC_MSG_ERROR([Brotli library functionality is required but was not found.])
     ])
 ])
 
@@ -185,50 +195,97 @@ AS_IF([test "x$with_brotli" = "xyes"], [
 AS_IF([test "x$with_gzip_ng" = "xyes"], [
     MODE="$ZLIB_NG"
     MY_CHECK_LIB([zlib_ng], [libz-ng], [z-ng], [zng_deflate])
-    AS_IF([test "x$HAVE_zlib_ng" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng"])
-        AS_VAR_APPEND([ALGOS], [" Gzip-NG/Deflate-NG"])
+
+    AS_IF([test "x$HAVE_zlib_ng" != "xyes"], [
+        AC_MSG_ERROR([zlib-ng library functionality is required but was not found.])
     ])
+
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip_ng -DZLIB_NG_LINK_TYPE=\\\"$MODE\\\""])
+    AS_VAR_APPEND([ALGOS], [" Gzip-NG/Deflate-NG"])
+    SUPPORT_GZIP_NG=""
 ])
 
 # Process standard legacy Zlib engine
 AS_IF([test "x$with_gzip" = "xyes"], [
     MODE="$ZLIB"
     MY_CHECK_LIB([zlib], [zlib], [z], [deflate])
-    AS_IF([test "x$HAVE_zlib" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip"])
-        AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
+
+    AS_IF([test "x$HAVE_zlib" != "xyes"], [
+        AC_MSG_ERROR([zlib library functionality is required but was not found.])
     ])
+
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_gzip -DZLIB_LINK_TYPE=\\\"$MODE\\\""])
+    AS_VAR_APPEND([ALGOS], [" Gzip/Deflate"])
+    SUPPORT_GZIP=""
 ])
 
 # --- Lz4 ---
 AS_IF([test "x$with_lz4" = "xyes"], [
     MODE="$LZ4"
     MY_CHECK_LIB([lz4], [liblz4], [lz4], [LZ4_compress_default])
-    AS_IF([test "x$HAVE_lz4" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_lz4"])
-        AS_VAR_APPEND([ALGOS], [" LZ4"])
+
+    AS_IF([test "x$HAVE_lz4" != "xyes"], [
+        AC_MSG_ERROR([LZ4 library functionality is required but was not found.])
     ])
+
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_lz4 -DLZ4_LINK_TYPE=\\\"$MODE\\\""])
+    AS_VAR_APPEND([ALGOS], [" LZ4"])
+    SUPPORT_LZ4=""
 ])
 
 # --- Snappy ---
 AS_IF([test "x$with_snappy" = "xyes"], [
     MODE="$SNAPPY"
     MY_CHECK_LIB([snappy], [libsnappy], [snappy], [snappy_compress])
-    AS_IF([test "x$HAVE_snappy" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_snappy"])
-        AS_VAR_APPEND([ALGOS], [" Snappy"])
+
+    AS_IF([test "x$HAVE_snappy" != "xyes"], [
+        AC_MSG_ERROR([Snappy library functionality is required but was not found.])
     ])
+
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_snappy -DSNAPPY_LINK_TYPE=\\\"$MODE\\\""])
+    AS_VAR_APPEND([ALGOS], [" Snappy"])
+    SUPPORT_SNAPPY=""
+
+    # Attempting to get Snappy version
+    SNAPPY_VER="x.y.z"
+    AS_IF([test "x$MODE" = "xstatic"], [
+        AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <snappy-stubs-public.h>]])], [
+            SNAPPY_HEADER=$($CPP $CPPFLAGS conftest.c 2>/dev/null | grep "snappy-stubs-public.h" | awk '{print $2}' | head -n1 | tr -d '"')
+        ], [
+            SNAPPY_HEADER=""
+        ])
+
+        AS_IF([test "x$SNAPPY_HEADER" != "x" -a -f "$SNAPPY_HEADER"], [
+            SNAPPY_VER=$(grep "#define SNAPPY_VERSION_STRING" "$SNAPPY_HEADER" | awk '{print $3}' | tr -d '"')
+
+            AS_IF([test "x$SNAPPY_VER" = "x"], [
+                MAJOR=$(grep "#define SNAPPY_MAJOR" "$SNAPPY_HEADER" | awk '{print $3}')
+                MINOR=$(grep "#define SNAPPY_MINOR" "$SNAPPY_HEADER" | awk '{print $3}')
+                PATCH=$(grep "#define SNAPPY_PATCH" "$SNAPPY_HEADER" | awk '{print $3}')
+
+                if test "x$MAJOR" != "x" -a "x$MINOR" != "x"; then
+                    SNAPPY_VER="${MAJOR}.${MINOR}.${PATCH:-0}"
+                fi
+            ])
+        ])
+
+        AS_IF([test "x$SNAPPY_VER" = "x"], [SNAPPY_VER="x.y.z"])
+    ])
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DSNAPPY_VERSION_STRING=\\\"${SNAPPY_VER}\\\""])
 ])
 
 # --- Zstandard ---
 AS_IF([test "x$with_zstd" = "xyes"], [
     MODE="$ZSTD"
     MY_CHECK_LIB([zstd], [libzstd], [zstd], [ZSTD_compress])
-    AS_IF([test "x$HAVE_zstd" = "xyes"], [
-        AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_zstd"])
-        AS_VAR_APPEND([ALGOS], [" Zstd"])
+
+    AS_IF([test "x$HAVE_zstd" != "xyes"], [
+        AC_MSG_ERROR([Zstd library functionality is required but was not found.])
     ])
+
+    AS_VAR_APPEND([COMPRESSION_CFLAGS], [" -DUSE_zstd -DZSTD_LINK_TYPE=\\\"$MODE\\\""])
+    AS_VAR_APPEND([ALGOS], [" Zstd"])
+    SUPPORT_ZSTD=""
 ])
 
 
@@ -252,6 +309,13 @@ AC_SUBST(CONFIGURE_RUN)
 AC_SUBST([GIT_VERSION])
 AC_SUBST([ALGO_LIST])
 
+AC_SUBST([SUPPORT_BROTLI])
+AC_SUBST([SUPPORT_GZIP])
+AC_SUBST([SUPPORT_GZIP_NG])
+AC_SUBST([SUPPORT_LZ4])
+AC_SUBST([SUPPORT_SNAPPY])
+AC_SUBST([SUPPORT_ZSTD])
+
 AC_MSG_NOTICE([==================================================])
 AC_MSG_NOTICE([GIT_VERSION:   $GIT_VERSION])
 AC_MSG_NOTICE([ALGO_LIST:     $ALGO_LIST])
@@ -261,5 +325,5 @@ AC_MSG_NOTICE([LIBS:          $LIBS])
 AC_MSG_NOTICE([CFLAGS MACROS: $COMPRESSION_CFLAGS])
 AC_MSG_NOTICE([==================================================])
 
-AC_CONFIG_FILES([Makefile.port tmp/Makefile pg_z.control])
+AC_CONFIG_FILES([Makefile.port tmp/Makefile pg_z.control sql/core_add.sql])
 AC_OUTPUT

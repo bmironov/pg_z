@@ -3,6 +3,19 @@
 #include "port/pg_crc32c.h"
 #include <snappy-c.h>
 
+#ifndef SNAPPY_LINK_TYPE
+#define SNAPPY_LIB_LINK_TYPE "N/A"
+#else
+#define SNAPPY_LIB_LINK_TYPE SNAPPY_LINK_TYPE
+#endif
+
+#ifndef SNAPPY_VERSION_STRING
+#define SNAPPY_VERSION "x.y.z"
+#else
+#define SNAPPY_VERSION SNAPPY_VERSION_STRING
+#endif
+
+PG_FUNCTION_INFO_V1(pg_snappy_lib_details);
 PG_FUNCTION_INFO_V1(pg_snappy);
 PG_FUNCTION_INFO_V1(pg_unsnappy);
 
@@ -31,6 +44,17 @@ snappy_crc32c(const uint8_t *restrict data, size_t length)
 
 	// Apply Snappy's specific masking as per the specification
 	return ((crc >> 15) | (crc << 17)) + 0xa282ead8;
+}
+
+/*
+ * This function returns Snappy library version used by this extension
+ */
+Datum
+pg_snappy_lib_details(PG_FUNCTION_ARGS)
+{
+	LibraryDetails item = {"Snappy", SNAPPY_VERSION, SNAPPY_LIB_LINK_TYPE};
+
+	PG_RETURN_DATUM(pg_z_lib_details_tuple(fcinfo, &item));
 }
 
 /*

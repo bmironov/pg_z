@@ -3,6 +3,13 @@
 #define ZSTD_STATIC_LINKING_ONLY // Expose advanced types like ZSTD_customMem
 #include <zstd.h>
 
+#ifndef ZSTD_LINK_TYPE
+#define ZSTD_LIB_LINK_TYPE "N/A"
+#else
+#define ZSTD_LIB_LINK_TYPE ZSTD_LINK_TYPE
+#endif
+
+PG_FUNCTION_INFO_V1(pg_zstd_lib_details);
 PG_FUNCTION_INFO_V1(pg_zstd);
 PG_FUNCTION_INFO_V1(pg_unzstd);
 
@@ -11,6 +18,17 @@ PG_FUNCTION_INFO_V1(pg_unzstd);
 typedef struct ZstdCleanupArg {
 	ZSTD_CCtx *cctx;
 } ZstdCleanupArg;
+
+/*
+ * This function returns Zstd library version used by this extension
+ */
+Datum
+pg_zstd_lib_details(PG_FUNCTION_ARGS)
+{
+	LibraryDetails item = {"Zstd", ZSTD_versionString(), ZSTD_LIB_LINK_TYPE};
+
+	PG_RETURN_DATUM(pg_z_lib_details_tuple(fcinfo, &item));
+}
 
 /*
  * Fail-safe callback executed by PostgreSQL if the memory context is reset or

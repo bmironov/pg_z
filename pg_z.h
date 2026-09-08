@@ -4,6 +4,7 @@
 #include <funcapi.h>
 #include <miscadmin.h>
 #include <utils/builtins.h>
+#include <utils/datum.h>
 #include <utils/elog.h>
 #include <utils/guc.h>
 #include <utils/memutils.h>
@@ -52,8 +53,19 @@ extern size_t max_uncompressed_size;
  * ===============================================================
  */
 
+typedef struct LibraryDetails {
+	const char *algorithm;
+	const char *version;
+	const char *linking;
+} LibraryDetails;
+
+// Number of items in CompressionLibraryDetails
+#define LIB_DETAILS_TUPLE_COLUMNS 3
+
 Datum pg_z_version(PG_FUNCTION_ARGS);
 Datum pg_z_version_num(PG_FUNCTION_ARGS);
+Datum pg_z_details(PG_FUNCTION_ARGS);
+Datum pg_z_lib_details_tuple(FunctionCallInfo fcinfo, LibraryDetails *item);
 
 /*
  * ===============================================================
@@ -94,6 +106,7 @@ void pg_hybrid_free(void *address);
  * ===============================================================
  */
 
+Datum pg_brotli_lib_details(PG_FUNCTION_ARGS);
 Datum pg_brotli(PG_FUNCTION_ARGS);
 Datum pg_unbrotli(PG_FUNCTION_ARGS);
 /*
@@ -103,12 +116,14 @@ Datum pg_unbrotli(PG_FUNCTION_ARGS);
  */
 
 // Standard zlib
+Datum pg_gzip_lib_details(PG_FUNCTION_ARGS);
 Datum pg_gzip(PG_FUNCTION_ARGS);
 Datum pg_gunzip(PG_FUNCTION_ARGS);
 Datum pg_deflate(PG_FUNCTION_ARGS);
 Datum pg_inflate(PG_FUNCTION_ARGS);
 
 // Zlib-NG
+Datum pg_gzip_ng_lib_details(PG_FUNCTION_ARGS);
 Datum pg_gzip_ng(PG_FUNCTION_ARGS);
 Datum pg_gunzip_ng(PG_FUNCTION_ARGS);
 Datum pg_deflate_ng(PG_FUNCTION_ARGS);
@@ -120,6 +135,7 @@ Datum pg_inflate_ng(PG_FUNCTION_ARGS);
  * ===============================================================
  */
 
+Datum pg_lz4_lib_details(PG_FUNCTION_ARGS);
 Datum pg_lz4(PG_FUNCTION_ARGS);
 Datum pg_unlz4(PG_FUNCTION_ARGS);
 
@@ -129,6 +145,7 @@ Datum pg_unlz4(PG_FUNCTION_ARGS);
  * ===============================================================
  */
 
+Datum pg_snappy_lib_details(PG_FUNCTION_ARGS);
 Datum pg_snappy(PG_FUNCTION_ARGS);
 Datum pg_unsnappy(PG_FUNCTION_ARGS);
 
@@ -138,6 +155,7 @@ Datum pg_unsnappy(PG_FUNCTION_ARGS);
  * ===============================================================
  */
 
+Datum pg_zstd_lib_details(PG_FUNCTION_ARGS);
 Datum pg_zstd(PG_FUNCTION_ARGS);
 Datum pg_unzstd(PG_FUNCTION_ARGS);
 

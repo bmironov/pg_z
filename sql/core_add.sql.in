@@ -1,0 +1,46 @@
+
+--
+-- pg_z_version()
+--
+
+CREATE OR REPLACE FUNCTION pg_z_version()
+    RETURNS text
+    AS 'MODULE_PATHNAME', 'pg_z_version'
+    LANGUAGE 'c'
+    IMMUTABLE STRICT
+    PARALLEL SAFE;
+
+--
+-- pg_z_version_num()
+--
+
+CREATE OR REPLACE FUNCTION pg_z_version_num()
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'pg_z_version_num'
+    LANGUAGE 'c'
+    IMMUTABLE STRICT
+    PARALLEL SAFE;
+
+
+--
+-- pg_z_details()
+--
+
+CREATE FUNCTION pg_z_details()
+    RETURNS TABLE (
+        algorithm TEXT,
+        version   TEXT,
+        linking   TEXT
+    )
+AS $$
+    SELECT r.algorithm, r.version, r.linking FROM (
+@SUPPORT_BROTLI@  SELECT (brotli_lib_details()).*  UNION ALL
+@SUPPORT_GZIP@    SELECT (gzip_lib_details()).*    UNION ALL
+@SUPPORT_GZIP_NG@ SELECT (gzip_ng_lib_details()).* UNION ALL
+@SUPPORT_LZ4@     SELECT (lz4_lib_details()).*     UNION ALL
+@SUPPORT_SNAPPY@  SELECT (snappy_lib_details()).*  UNION ALL
+@SUPPORT_ZSTD@    SELECT (zstd_lib_details()).*    UNION ALL
+                  -- Dummy fallback row to keep UNION syntax valid if zero libraries are compiled
+                  SELECT NULL::text, NULL::text, NULL::text WHERE FALSE
+    ) r;
+$$ LANGUAGE 'sql' IMMUTABLE STRICT PARALLEL SAFE;

@@ -2,6 +2,18 @@
 -- Algorithm: brotli
 --
 
+-- brotli_lib_details
+ CREATE OR REPLACE FUNCTION brotli_lib_details()
+     RETURNS TABLE (
+         algorithm text,
+         version text,
+         linking text
+     )
+     AS 'MODULE_PATHNAME', 'pg_brotli_lib_details'
+     LANGUAGE 'c'
+     IMMUTABLE STRICT
+     PARALLEL SAFE;
+
 -- brotli
 CREATE OR REPLACE FUNCTION brotli(uncompressed bytea, compression_level integer default 3)
      RETURNS bytea

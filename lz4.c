@@ -1,10 +1,29 @@
 #include "pg_z.h"
 
 #define LZ4F_STATIC_LINKING_ONLY // Open access to custom memory management API
+#include <lz4.h>
 #include <lz4frame.h>
 
+#ifndef LZ4_LINK_TYPE
+#define LZ4_LIB_LINK_TYPE "N/A"
+#else
+#define LZ4_LIB_LINK_TYPE LZ4_LINK_TYPE
+#endif
+
+PG_FUNCTION_INFO_V1(pg_lz4_lib_details);
 PG_FUNCTION_INFO_V1(pg_lz4);
 PG_FUNCTION_INFO_V1(pg_unlz4);
+
+/*
+ * This function returns LZ4 library version used by this extension
+ */
+Datum
+pg_lz4_lib_details(PG_FUNCTION_ARGS)
+{
+	LibraryDetails item = {"LZ4", LZ4_versionString(), LZ4_LIB_LINK_TYPE};
+
+	PG_RETURN_DATUM(pg_z_lib_details_tuple(fcinfo, &item));
+}
 
 /*
  *

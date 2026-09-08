@@ -1,5 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS pg_z;
 
+-- gzip_lib_details
+SELECT COUNT(*) FROM gzip_lib_details();
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking]) FROM gzip_lib_details()
+);
+
 -- gzip function tests
 SELECT gzip(NULL) AS gzip_null;
 SELECT gzip('') AS gzip_blank;

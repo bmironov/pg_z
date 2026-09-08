@@ -13,7 +13,7 @@ export DATA
 
 -include Makefile.port
 
-ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(COMPRESSION_CFLAGS))
+ACTIVE_ALGOS := $(patsubst -DUSE_%,%,$(filter -DUSE_%,$(COMPRESSION_CFLAGS)))
 
 empty :=
 space := $(empty) $(empty)

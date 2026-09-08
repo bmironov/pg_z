@@ -1,6 +1,20 @@
 --
 -- Algorithm: zstd
 --
+
+
+-- zstd_lib_details
+ CREATE OR REPLACE FUNCTION zstd_lib_details()
+     RETURNS TABLE (
+         algorithm text,
+         version text,
+         linking text
+     )
+     AS 'MODULE_PATHNAME', 'pg_zstd_lib_details'
+     LANGUAGE 'c'
+     IMMUTABLE STRICT
+     PARALLEL SAFE;
+
 -- NOTE: The updated Zstandard integration isolates all internal worker
 -- thread workspaces to standard system malloc, completely removing concurrent
 -- execution dependencies on the single-threaded PostgreSQL MemoryContext.

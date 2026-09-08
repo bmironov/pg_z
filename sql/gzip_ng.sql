@@ -1,5 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS pg_z;
 
+-- gzip_ng_lib_details
+SELECT COUNT(*) FROM gzip_ng_lib_details();
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking]) FROM gzip_ng_lib_details()
+);
+
 -- gzip_ng function tests
 SELECT gzip_ng(NULL) AS gzip_ng_null;
 SELECT gzip_ng('') AS gzip_ng_blank;
