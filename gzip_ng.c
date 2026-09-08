@@ -2,6 +2,13 @@
 
 #include <zlib-ng.h>
 
+#ifndef ZLIB_NG_LINK_TYPE
+#define ZLIB_NG_LIB_LINK_TYPE "N/A"
+#else
+#define ZLIB_NG_LIB_LINK_TYPE ZLIB_NG_LINK_TYPE
+#endif
+
+PG_FUNCTION_INFO_V1(pg_gzip_ng_lib_details);
 PG_FUNCTION_INFO_V1(pg_deflate_ng);
 PG_FUNCTION_INFO_V1(pg_gzip_ng);
 PG_FUNCTION_INFO_V1(pg_inflate_ng);
@@ -27,6 +34,19 @@ PG_FUNCTION_INFO_V1(pg_gunzip_ng);
 
 PG_FUNCTION_INFO_V1(MY_COMPRESS);
 PG_FUNCTION_INFO_V1(MY_DECOMPRESS);
+
+/*
+ * This function returns zlib-ng library version used by this extension
+ */
+Datum
+pg_gzip_ng_lib_details(PG_FUNCTION_ARGS)
+{
+	LibraryDetails item = {
+			"Gzip-NG/Deflate-NG", ZLIBNG_VERSION, ZLIB_NG_LIB_LINK_TYPE};
+
+	PG_RETURN_DATUM(pg_z_lib_details_tuple(fcinfo, &item));
+}
+
 /*
  * deflate an uncompressed bytea
  */

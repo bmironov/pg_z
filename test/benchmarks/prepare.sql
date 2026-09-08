@@ -36,6 +36,11 @@ SELECT
 FROM generate_series(1, 200000) AS i;
 
 \o
+\echo
+\echo Following compression libraries are available:
+\echo
+SELECT * FROM pg_z_details();
+
 \echo Prepared following test data set:
 -- getting exact size of test data
 SELECT

@@ -6,8 +6,6 @@
 
 PG_MODULE_MAGIC;
 
-PG_FUNCTION_INFO_V1(pg_z_version);
-
 // GUC: memory allocation chunk size in bytes
 static int guc_memory_chunk_size;
 // shadow of GUC parameter of size_t type
@@ -104,61 +102,6 @@ _PG_init(void)
 			NULL);
 
 	pg_mem_tracker_init_hugepage_size();
-}
-
-Datum
-pg_z_version(PG_FUNCTION_ARGS)
-{
-	/*
-	 * Accumulate active userspace algorithms into a clean comma-separated list
-	 */
-	bool first = true;
-	StringInfoData buf;
-	initStringInfo(&buf);
-	appendStringInfo(&buf, "pg_z v%s (compiled with: ", PG_Z_VERSION);
-
-#ifdef USE_brotli
-	appendStringInfo(&buf, "brotli");
-	first = false;
-#endif
-
-#ifdef USE_gzip
-	if (!first)
-		appendStringInfo(&buf, ", ");
-	appendStringInfo(&buf, "gzip, deflate");
-	first = false;
-#endif
-
-#ifdef USE_gzip_ng
-	if (!first)
-		appendStringInfo(&buf, ", ");
-	appendStringInfo(&buf, "gzip-ng, deflate-ng");
-	first = false;
-#endif
-
-#ifdef USE_lz4
-	if (!first)
-		appendStringInfo(&buf, ", ");
-	appendStringInfo(&buf, "lz4");
-	first = false;
-#endif
-
-#ifdef USE_snappy
-	if (!first)
-		appendStringInfo(&buf, ", ");
-	appendStringInfo(&buf, "snappy");
-	first = false;
-#endif
-
-#ifdef USE_zstd
-	if (!first)
-		appendStringInfo(&buf, ", ");
-	appendStringInfo(&buf, "zstd");
-#endif
-
-	appendStringInfo(&buf, ")");
-
-	PG_RETURN_TEXT_P(cstring_to_text(buf.data));
 }
 
 /*

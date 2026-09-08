@@ -1,5 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS pg_z;
 
+-- brotli_lib_details
+SELECT COUNT(*) FROM brotli_lib_details();
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking]) FROM brotli_lib_details()
+);
+
 -- brotli function tests
 SELECT brotli(NULL) AS brotli_null;
 SELECT brotli('') AS brotli_blank;

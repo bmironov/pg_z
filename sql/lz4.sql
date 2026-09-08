@@ -1,5 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS pg_z;
 
+-- lz4_lib_details
+SELECT COUNT(*) FROM lz4_lib_details();
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking]) FROM lz4_lib_details()
+);
+
 -- lz4 function tests
 SELECT lz4(NULL) AS lz4_null;
 SELECT lz4('') AS lz4_blank;

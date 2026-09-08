@@ -1,4 +1,19 @@
 CREATE EXTENSION IF NOT EXISTS pg_z;
+-- snappy_lib_details
+SELECT COUNT(*) FROM snappy_lib_details();
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking]) FROM snappy_lib_details()
+);
+ count 
+-------
+     3
+(1 row)
+
 -- snappy function tests
 SELECT snappy(NULL) AS snappy_null;
  snappy_null 

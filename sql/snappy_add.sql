@@ -2,6 +2,18 @@
 -- Algorithm: snappy
 --
 
+-- snappy_lib_details
+ CREATE OR REPLACE FUNCTION snappy_lib_details()
+     RETURNS TABLE (
+         algorithm text,
+         version text,
+         linking text
+     )
+     AS 'MODULE_PATHNAME', 'pg_snappy_lib_details'
+     LANGUAGE 'c'
+     IMMUTABLE STRICT
+     PARALLEL SAFE;
+
 -- snappy
  CREATE OR REPLACE FUNCTION snappy(uncompressed bytea)
      RETURNS bytea

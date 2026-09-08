@@ -2,6 +2,18 @@
 -- Algorithm: gzip
 --
 
+-- gzip_lib_details
+ CREATE OR REPLACE FUNCTION gzip_lib_details()
+     RETURNS TABLE (
+         algorithm text,
+         version text,
+         linking text
+     )
+     AS 'MODULE_PATHNAME', 'pg_gzip_lib_details'
+     LANGUAGE 'c'
+     IMMUTABLE STRICT
+     PARALLEL SAFE;
+
 -- deflate
  CREATE OR REPLACE FUNCTION deflate(uncompressed bytea, compression_level integer default -1)
      RETURNS bytea

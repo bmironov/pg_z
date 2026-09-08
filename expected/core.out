@@ -8,4 +8,64 @@ SELECT pg_z_version();
  pg_z v1.0.1 (compiled with: brotli, gzip, deflate, gzip-ng, deflate-ng, lz4, snappy, zstd)
 (1 row)
 
+--
+-- pg_z_vresion_num
+--
+SELECT to_hex(pg_z_version_num());
+ to_hex 
+--------
+ 10001
+(1 row)
+
+--
+-- pg_z_details
+--
+\set algos $${"Brotli", "Gzip/Deflate", "Gzip-NG/Deflate-NG", "LZ4", "Snappy", "Zstd"}$$
+\set links $${"static", "dynamic"}$$
+SELECT COUNT(*) FROM pg_z_details();
+ count 
+-------
+     6
+(1 row)
+
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking])
+    FROM pg_z_details()
+    WHERE algorithm='LZ4'
+);
+ count 
+-------
+     3
+(1 row)
+
+SELECT COUNT(*) FROM pg_z_details() WHERE algorithm='Unknown';
+ count 
+-------
+     0
+(1 row)
+
+SELECT COUNT(*) FROM pg_z_details() WHERE algorithm = ANY(:algos::TEXT[]);
+ count 
+-------
+     6
+(1 row)
+
+SELECT COUNT(*) FROM pg_z_details() WHERE algorithm = ANY(:algos::TEXT[]) AND linking = ANY(:links::TEXT[]);
+ count 
+-------
+     6
+(1 row)
+
+SELECT COUNT(*) FROM pg_z_details() WHERE algorithm != ALL(:algos::TEXT[]);
+ count 
+-------
+     0
+(1 row)
+
+SELECT COUNT(*) FROM pg_z_details() WHERE linking != ALL(:links::TEXT[]);
+ count 
+-------
+     0
+(1 row)
+
 DROP EXTENSION pg_z;

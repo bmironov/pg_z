@@ -2,6 +2,18 @@
 -- Algorithm: gzip_ng
 --
 
+-- gzip_ng_lib_details
+ CREATE OR REPLACE FUNCTION gzip_ng_lib_details()
+     RETURNS TABLE (
+         algorithm text,
+         version text,
+         linking text
+     )
+     AS 'MODULE_PATHNAME', 'pg_gzip_ng_lib_details'
+     LANGUAGE 'c'
+     IMMUTABLE STRICT
+     PARALLEL SAFE;
+
 -- deflate_ng
  CREATE OR REPLACE FUNCTION deflate_ng(uncompressed bytea, compression_level integer default -1)
      RETURNS bytea

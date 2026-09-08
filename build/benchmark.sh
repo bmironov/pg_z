@@ -8,6 +8,9 @@ FAILED=0
 # Fail rest of the script at first error
 set -e
 
+ALGOS=$1
+[ "a$ALGOS" == "a" ] && ALGOS=$BENCHMARK_ALGOS
+
 cleanup() {
     echo "Cleaning up benchmark environment..."
     psql -q -v ON_ERROR_STOP=1 -f ${SCRIPTS}/teardown.sql >/dev/null 2>&1 || true
@@ -35,6 +38,7 @@ show_header() {
 # Prepare test environment
 [ ! -d $RESULTS ] && mkdir $RESULTS
 rm -f ${RESULTS}/*
+echo "Benchmarking following algorithms: $ALGOS"
 psql -q -v ON_ERROR_STOP=1 -f ${SCRIPTS}/prepare.sql
 
 show_header

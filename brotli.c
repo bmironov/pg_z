@@ -4,11 +4,43 @@
 #include <brotli/decode.h>
 #include <brotli/encode.h>
 
+/* Stream chunk buffer size used to check for PostgreSQL backend signals */
+#define WORK_CHUNK_SIZE (1024 * 1024)
+
+#ifndef BROTLI_LINK_TYPE
+#define BROTLI_LIB_LINK_TYPE "N/A"
+#else
+#define BROTLI_LIB_LINK_TYPE BROTLI_LINK_TYPE
+#endif
+
+PG_FUNCTION_INFO_V1(pg_brotli_lib_details);
 PG_FUNCTION_INFO_V1(pg_brotli);
 PG_FUNCTION_INFO_V1(pg_unbrotli);
 
-/* Stream chunk buffer size used to check for PostgreSQL backend signals */
-#define WORK_CHUNK_SIZE (1024 * 1024)
+/*
+ * This function returns Brotli library version used by this extension
+ */
+Datum
+pg_brotli_lib_details(PG_FUNCTION_ARGS)
+{
+	LibraryDetails item;
+	uint32_t ver = BrotliEncoderVersion();
+	char ver_str[32];
+
+	snprintf(
+			ver_str,
+			32,
+			"%u.%u.%u",
+			ver >> 24,
+			(ver >> 12) & 0xFFF,
+			ver & 0xFFF);
+
+	item.algorithm = "Brotli";
+	item.version = ver_str;
+	item.linking = BROTLI_LIB_LINK_TYPE;
+
+	PG_RETURN_DATUM(pg_z_lib_details_tuple(fcinfo, &item));
+}
 
 /*
  * Custom allocation wrapper for brotli. Helps to force usage of palloc

@@ -4,7 +4,7 @@ DATA = pg_z--$(GIT_VERSION).sql
 CONTROL = pg_z.control
 VPATH = ..
 
-SRC_MODULES = pg_z mem_tracker mem_manager
+SRC_MODULES = pg_z pg_z_core mem_tracker mem_manager
 REGRESS := core db_params
 ALGO_MODULES = brotli gzip gzip_ng lz4 snappy zstd
 
@@ -87,15 +87,7 @@ PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
-all: format-extension-output
-
-format-extension-output:
-ifndef DEBUG_BUILD
-	@echo "=== Stripping out debug info from .so ==="
-	@$(STRIP_CMD)
-endif
-	@echo "=== Generating SQL extension file ==="
-	@../build/generate_sql.sh ..
+all:
 
 distclean: clean
 	rm -f Makefile Makefile.port

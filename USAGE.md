@@ -6,6 +6,31 @@
     * [`pg_z_vresion`](#pg_z_vresion)
         + [`pg_z_vresion` Description](#pg_z_vresion-description)
         + [`pg_z_vresion` Examples](#pg_z_vresion-examples)
+    * [`pg_z_version_num`](#pg_z_version_num)
+        + [`pg_z_vresion_num` Description](#pg_z_vresion_num-description)
+        + [`pg_z_version_num` Examples](#pg_z_version_num-examples)
+- [Library Metadata Functions](#library-metadata-functions)
+    * [`brotli_lib_details`](#brotli_lib_details)
+        + [`brotli_lib_details` Description](#brotli_lib_details-description)
+        + [`brotli_lib_details` Examples](#brotli_lib_details-examples)
+    * [`gzip_lib_details`](#gzip_lib_details)
+        + [`gzip_lib_details` Description](#gzip_lib_details-description)
+        + [`gzip_lib_details` Examples](#gzip_lib_details-examples)
+    * [`gzip_ng_lib_details`](#gzip_ng_lib_details)
+        + [`gzip_ng_lib_details` Description](#gzip_ng_lib_details-description)
+        + [`gzip_ng_lib_details` Examples](#gzip_ng_lib_details-examples)
+    * [`lz4_lib_details`](#lz4_lib_details)
+        + [`lz4_lib_details` Description](#lz4_lib_details-description)
+        + [`lz4_lib_details` Examples](#lz4_lib_details-examples)
+    * [`snappy_lib_details`](#snappy_lib_details)
+        + [`snappy_lib_details` Description](#snappy_lib_details-description)
+        + [`snappy_lib_details` Examples](#snappy_lib_details-examples)
+    * [`zstd_lib_details()`](#zstd_lib_details)
+        + [`zstd_lib_details` Description](#zstd_lib_details-description)
+        + [`zstd_lib_details` Examples](#zstd_lib_details-examples)
+    * [`pg_z_details`](#pg_z_details)
+        + [`pg_z_details` Description](#pg_z_details-description)
+        + [`pg_z_details` Examples](#pg_z_details-examples)
 - [Brotli Algorithm](#brotli-algorithm)
     * [`brotli`](#brotli)
         + [`brotli` Description](#brotli-description)
@@ -106,6 +131,264 @@ postgres=# SELECT pg_z_version();
 This output dynamically adjusts based on your build configuration, providing a
 reliable method for database administrators or migration scripts to verify
 available compression capabilities on the fly.
+
+***
+
+### `pg_z_version_num`
+
+```text
+pg_z_version_num() → integer
+```
+
+#### `pg_z_vresion_num` Description
+
+The `pg_z_version_num()` function returns the extension version as an integer
+encoded with the following bit mask:
+
+- Bits 16 - 30: Major version number
+- Bits 8 - 15: Minor version number
+- Bits 0 - 7: Patch level
+
+For example, version `1.2.3` is returned as the hexadecimal value `0x010203`.
+
+This function is `IMMUTABLE`, `STRICT`, and `PARALLEL SAFE`, allowing the
+PostgreSQL query planner to optimize execution across parallel worker paths.
+
+#### `pg_z_version_num` Examples
+
+```sql
+postgres=# SELECT to_hex(pg_z_version_num());
+ to_hex
+--------
+ 10001
+(1 row)
+```
+
+Above value of `0x10001` represents `v1.0.1`.
+
+***
+
+## Library Metadata Functions
+
+These functions return a composite row containing granular details about a
+specific compression library. Each function returns a row with the following
+format:
+
+```sql
+(
+    algorithm text, -- compression algorithm name
+    version text,   -- linked library version
+    linking text    -- type of linking ('static' or 'dynamic')
+)
+```
+
+*Note: If an algorithm was excluded during the build (via
+`./configure --without-<algo>`), its corresponding metadata function will not
+be registered in the database.*
+
+### `brotli_lib_details`
+
+```text
+brotli_lib_details() → record
+```
+
+#### `brotli_lib_details` Description
+
+Returns compilation metadata for the linked `Brotli` library.
+
+#### `brotli_lib_details` Examples
+
+```sql
+SELECT * FROM brotli_lib_details();
+
+ algorithm | version | linking
+-----------+---------+---------
+ Brotli    | 1.1.0   | dynamic
+(1 row)
+```
+
+***
+
+### `gzip_lib_details`
+
+```text
+gzip_lib_details() → record
+```
+
+#### `gzip_lib_details` Description
+
+Returns compilation metadata for the linked `zlib` library.
+
+#### `gzip_lib_details` Examples
+
+```sql
+SELECT * FROM gzip_lib_details();
+
+  algorithm   | version | linking
+--------------+---------+---------
+ Gzip/Deflate | 1.3.1   | dynamic
+(1 row)
+```
+
+***
+
+### `gzip_ng_lib_details`
+
+```text
+gzip_ng_lib_details() → record
+```
+
+#### `gzip_ng_lib_details` Description
+
+Returns compilation metadata for the linked `zlib-ng` library.
+
+#### `gzip_ng_lib_details` Examples
+
+```sql
+SELECT * FROM gzip_ng_lib_details();
+
+     algorithm      | version | linking
+--------------------+---------+---------
+ Gzip-NG/Deflate-NG | 2.3.3   | static
+(1 row)
+```
+
+***
+
+### `lz4_lib_details`
+
+```text
+lz4_lib_details() → record
+```
+
+#### `lz4_lib_details` Description
+
+Returns compilation metadata for the linked `LZ4` library.
+
+#### `lz4_lib_details` Examples
+
+```sql
+SELECT * FROM lz4_lib_details();
+
+ algorithm | version | linking
+-----------+---------+---------
+ LZ4       | 1.10.0  | static
+(1 row)
+```
+
+***
+
+### `snappy_lib_details`
+
+```text
+snappy_lib_details() → record
+```
+
+#### `snappy_lib_details` Description
+
+Returns compilation metadata for the linked `Snappy` library.
+
+> [!NOTE]
+> Google Snappy does not natively provide a runtime function (like
+> `snappy_version()`) to retrieve its version during database execution.
+> To address this limitation, `pg_z` attempts to resolve the version during the
+> configuration stage as follows:
+>
+> - **Dynamic Linking**: If Snappy is linked dynamically, the extension cannot
+>   guarantee which exact version of `libsnappy.so` will be loaded by the
+>   operating system at runtime. To prevent displaying misleading information,
+>   the version is strictly hardcoded to `"x.y.z"`.
+> - **Static Linking**: If Snappy is linked statically, the build system
+>   (`configure.ac`) attempts to extract the exact version by parsing the
+>   installed Snappy headers. It searches for a monolithic
+>   `SNAPPY_VERSION_STRING` macro (older 1.1.x versions) or assembles it from
+>   `SNAPPY_MAJOR`, `SNAPPY_MINOR`, and `SNAPPY_PATCH` macros (modern 1.2.x+
+>   versions). If this compile-time header lookup fails, the extension
+>   gracefully falls back to a default known static build signature or `"x.y.z"`.
+
+#### `snappy_lib_details` Examples
+
+```sql
+SELECT * FROM snappy_lib_details();
+
+ algorithm | version | linking
+-----------+---------+---------
+ Snappy    | 1.2.2   | static
+(1 row)
+
+-- OR --
+
+SELECT * FROM snappy_lib_details();
+ algorithm | version | linking
+-----------+---------+---------
+ Snappy    | x.y.z   | dynamic
+(1 row)
+
+```
+
+***
+
+### `zstd_lib_details()`
+
+```text
+zstd_lib_details() → record
+```
+
+#### `zstd_lib_details` Description
+
+Returns compilation metadata for the linked `Zstandard (Zstd)` library.
+
+#### `zstd_lib_details` Examples
+
+```sql
+SELECT * FROM zstd_lib_details();
+
+ algorithm | version | linking
+-----------+---------+---------
+ Zstd      | 1.5.7   | static
+(1 row)
+```
+
+***
+
+### `pg_z_details`
+
+```text
+pg_z_details() → rowset
+```
+
+#### `pg_z_details` Description
+
+A set-returning function (SRF) that aggregates the metadata from all compiled
+libraries and presents them as a single queryable table layout. If no libraries
+were compiled into the extension, it gracefully returns an empty rowset
+(0 rows).
+
+#### `pg_z_details` Examples
+
+```sql
+SELECT * FROM pg_z_details();
+
+     algorithm      | version | linking
+--------------------+---------+---------
+ Brotli             | 1.1.0   | dynamic
+ Gzip-NG/Deflate-NG | 2.3.3   | static
+ Gzip/Deflate       | 1.3.1   | dynamic
+ LZ4                | 1.10.0  | static
+ Snappy             | x.y.z   | dynamic
+ Zstd               | 1.5.7   | static
+(6 rows)
+
+
+SELECT * FROM pg_z_details() WHERE linking = 'dynamic';
+
+  algorithm   | version | linking
+--------------+---------+---------
+ Brotli       | 1.1.0   | dynamic
+ Gzip/Deflate | 1.3.1   | dynamic
+ Snappy       | x.y.z   | dynamic
+(3 rows)
+```
 
 ***
 
