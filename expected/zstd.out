@@ -1,4 +1,19 @@
 CREATE EXTENSION IF NOT EXISTS pg_z;
+-- zstd_lib_details
+SELECT COUNT(*) FROM zstd_lib_details();
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM (
+    SELECT unnest(array[algorithm, version, linking]) FROM zstd_lib_details()
+);
+ count 
+-------
+     3
+(1 row)
+
 -- zstd function tests
 SELECT zstd(NULL) AS zstd_null;
  zstd_null 
