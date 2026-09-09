@@ -248,12 +248,11 @@ AS_IF([test "x$with_snappy" = "xyes"], [
 
     # Attempting to get Snappy version
     SNAPPY_VER="x.y.z"
+    SNAPPY_HEADER=""
     AS_IF([test "x$MODE" = "xstatic"], [
-        AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <snappy-stubs-public.h>]])], [
-            SNAPPY_HEADER=$($CPP $CPPFLAGS conftest.c 2>/dev/null | grep "snappy-stubs-public.h" | awk '{print $2}' | head -n1 | tr -d '"')
-        ], [
-            SNAPPY_HEADER=""
-        ])
+        echo "#include <snappy-stubs-public.h>" > conftest.c
+        SNAPPY_HEADER=`$CC $CFLAGS $CPPFLAGS -H -E conftest.c 2>&1 | grep 'snappy-stubs-public.h' | head -n 1 | awk '{print $NF}'`
+        rm -f conftest.c
 
         AS_IF([test "x$SNAPPY_HEADER" != "x" -a -f "$SNAPPY_HEADER"], [
             SNAPPY_VER=$(grep "#define SNAPPY_VERSION_STRING" "$SNAPPY_HEADER" | awk '{print $3}' | tr -d '"')

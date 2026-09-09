@@ -59,7 +59,7 @@ install:
 		cp -f $(SUBDIRS)/pg_z.so.debug "$$TARGET_DIR/pg_z.so"; \
 	fi
 
-installcheck:
+installcheck: show-details
 	$(MAKE) -C $(SUBDIRS) -f Makefile installcheck
 
 benchmark: all
@@ -76,6 +76,14 @@ distclean:
 	-$(MAKE) -C $(SUBDIRS) -f Makefile distclean 2>/dev/null || true
 	rm -rf Makefile.port config.log config.status autom4te.cache
 	rm -f $(SUBDIRS)/Makefile $(SUBDIRS)/Makefile.port $(SUBDIRS)/pg_z.so.debug
+
+show-details:
+	psql -c " \
+		DROP EXTENSION IF EXISTS pg_z; \
+		CREATE EXTENSION pg_z; \
+		SELECT * FROM pg_z_version(); \
+		SELECT * FROM pg_z_details(); \
+	" || true
 
 strip-debug-info:
 	echo "=== Stripping out debug info from .so ==="

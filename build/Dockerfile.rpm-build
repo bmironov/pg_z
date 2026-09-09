@@ -282,6 +282,15 @@ RUN set +e \
     && pg_ctl -D ${PGDATA} -l ${PGDATA}/logfile start \
     && make installcheck || true \
     && if [ -f tmp/regression.diffs ]; then cat tmp/regression.diffs; exit 1; fi \
+    && PG_Z_DETAILS=pg_z_details.log && FAILED="0" \
+    && psql -c "CREATE EXTENSION IF NOT EXISTS pg_z; SELECT * FROM pg_z_details();" > ${PG_Z_DETAILS} \
+    && if [ $(grep -c -e "Brotli.*${BROTLI_VERSION}.*static" ${PG_Z_DETAILS}) = "0" ]; then echo "ERROR: Unexpected version of Brotli"; FAILED=1; fi \
+    && if [ $(grep -c -e "Gzip/.*${GZIP_VERSION}.*static" ${PG_Z_DETAILS}) = "0" ]; then echo "ERROR: Unexpected version of Gzip"; FAILED=1; fi \
+    && if [ $(grep -c -e "Gzip-NG.*${GZIP_NG_VERSION}.*static" ${PG_Z_DETAILS}) = "0" ]; then echo "ERROR: Unexpected version of Gzip-NG"; FAILED=1; fi \
+    && if [ $(grep -c -e "LZ4.*${LZ4_VERSION}.*static" ${PG_Z_DETAILS}) = "0" ]; then echo "ERROR: Unexpected version of LZ4"; FAILED=1; fi \
+    && if [ $(grep -c -e "Snappy.*${SNAPPY_VERSION}.*static" ${PG_Z_DETAILS}) = "0" ]; then echo "ERROR: Unexpected version of Snappy"; FAILED=1; fi \
+    && if [ $(grep -c -e "Zstd.*${ZSTD_VERSION}.*static" ${PG_Z_DETAILS}) = "0" ]; then echo "ERROR: Unexpected version of Zstd"; FAILED=1; fi \
+    && if [ "$FAILED" != "0" ]; then echo "ERROR: Compression libraries version tests failed"; exit 1; fi \
     && pg_ctl -D ${PGDATA} stop
 
 USER root
