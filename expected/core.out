@@ -5,7 +5,7 @@ CREATE EXTENSION pg_z;
 SELECT pg_z_version();
                                         pg_z_version                                        
 --------------------------------------------------------------------------------------------
- pg_z v1.1.0 (compiled with: brotli, gzip, deflate, gzip-ng, deflate-ng, lz4, snappy, zstd)
+ pg_z v1.1.1 (compiled with: brotli, gzip, deflate, gzip-ng, deflate-ng, lz4, snappy, zstd)
 (1 row)
 
 --
@@ -14,7 +14,7 @@ SELECT pg_z_version();
 SELECT to_hex(pg_z_version_num());
  to_hex 
 --------
- 10100
+ 10101
 (1 row)
 
 --
