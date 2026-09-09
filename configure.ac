@@ -121,6 +121,34 @@ SUPPORT_SNAPPY="--"
 SUPPORT_ZSTD="--"
 
 # ===========================================================================
+# HELPER FUNCTION FOR RESOLVING PHYSICAL PATHS
+# ===========================================================================
+
+# Shell function to scan given LDFLAGS for a static archive (.a)
+# Usage: pg_z_find_static_lib "$LDFLAGS" "name_without_lib"
+# Returns: Echoes the absolute path if found, or an empty string
+find_static_lib() {
+    local SEARCH_FLAGS="$1"
+    local LIB_NAME="$2"
+    local FOUND_PATH=""
+
+    for FLAG in $SEARCH_FLAGS; do
+        case "$FLAG" in
+            -L*)
+                # POSIX parameter expansion safely removes the -L prefix
+                local DIR_PATH="${FLAG#-L}"
+                if test -f "${DIR_PATH}/lib${LIB_NAME}.a"; then
+                    FOUND_PATH="${DIR_PATH}/lib${LIB_NAME}.a"
+                    break
+                fi
+                ;;
+        esac
+    done
+
+    echo "$FOUND_PATH"
+}
+
+# ===========================================================================
 # REUSABLE MACROS FOR LIBRARY DETECTION
 # ===========================================================================
 
@@ -138,7 +166,12 @@ AC_DEFUN([MY_CHECK_LIB], [
         LDFLAGS="$LDFLAGS -static"
 
         AC_CHECK_LIB([$3], [$4], [
-            AS_VAR_APPEND([STATIC_LIBS], [" -l$3"])
+            static_file_path=$(find_static_lib "$save_LDFLAGS" "$3")
+            AS_IF([test -n "$static_file_path"], [
+                AS_VAR_APPEND([STATIC_LIBS], [" $static_file_path"])
+            ], [
+                AS_VAR_APPEND([STATIC_LIBS], [" -l$3"])
+            ])
             AS_VAR_SET([HAVE_$1], [yes])
         ], [
             AC_MSG_NOTICE([Library lib$3.a is missing. If its functionality is needed, install $1 development package.])

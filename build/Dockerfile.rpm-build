@@ -27,9 +27,10 @@ ENV SOURCE_DIR="/source"
 ENV PGDATA="/var/lib/pgsql/data"
 
 ENV CFLAGS="-I/opt/include -pthread"
-ENV LDFLAGS="-B/opt/lib64/ -L/opt/lib64"
+ENV LDFLAGS="-L/opt/lib64"
 ENV SYS_LDFLAGS="-L/usr/lib64 -L/usr/lib -pthread -static-libgcc -static-libstdc++"
 ENV LIBS=""
+ENV EXCLUDE_LIBS=""
 ENV SYS_LIBS="-lpthread -lm -lstdc++"
 ENV ALGO_LIST=""
 ENV PATH="/usr/bin:/usr/sbin:${PATH}:/usr/pgsql-${PG_VERSION}/bin"
@@ -93,6 +94,7 @@ RUN curl -L -O "https://github.com/google/brotli/archive/refs/tags/v${BROTLI_VER
     && cmake --build . --parallel $(nproc) \
     && cmake --install . 
 ENV ALGO_LIST="${ALGO_LIST} Brotli"
+ENV EXCLUDE_LIBS="${EXCLUDE_LIBS}:libbrotlienc.a:libbrotlidec.a:libbrotlicommon.a"
 
 # Compile Static zlib-ng
 WORKDIR /opt/build/zlib-ng
@@ -113,6 +115,7 @@ RUN curl -L -O "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_V
     && cmake --build . --parallel $(nproc) \
     && cmake --install . 
 ENV ALGO_LIST="${ALGO_LIST} Gzip-NG/Deflate-NG"
+ENV EXCLUDE_LIBS="${EXCLUDE_LIBS}:libz-ng.a"
 
 # Compile Static Vanilla zlib
 WORKDIR /opt/build/zlib
@@ -124,6 +127,7 @@ RUN curl -L -O "https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VERSION
     && make install \
     && mkdir -p /opt/lib64 && mv /opt/lib/libz.a /opt/lib64/
 ENV ALGO_LIST="${ALGO_LIST} Gzip/Deflate"
+ENV EXCLUDE_LIBS="${EXCLUDE_LIBS}:libz.a"
 
 # Compile Static Modern LZ4
 WORKDIR /opt/build/lz4
@@ -139,6 +143,7 @@ RUN curl -L -O "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar
     # linker gives priority to .so, therefore removing it
     && rm -f /opt/lib64/liblz4.so*
 ENV ALGO_LIST="${ALGO_LIST} Lz4"
+ENV EXCLUDE_LIBS="${EXCLUDE_LIBS}:liblz4.a"
 
 # Compile Static Modern Snappy
 WORKDIR /opt/build/snappy
@@ -158,6 +163,7 @@ RUN curl -L -O "https://github.com/google/snappy/archive/refs/tags/${SNAPPY_VERS
     && cmake --build . --parallel $(nproc) \
     && cmake --install .
 ENV ALGO_LIST="${ALGO_LIST} Snappy"
+ENV EXCLUDE_LIBS="${EXCLUDE_LIBS}:libsnappy.a"
 
 # Compile Static Modern Zstandard
 WORKDIR /opt/build/zstd
@@ -178,6 +184,7 @@ RUN curl -L -O "https://github.com/facebook/zstd/archive/refs/tags/v${ZSTD_VERSI
     -DCMAKE_INSTALL_LIBDIR=lib64 \
     && cmake --build . --parallel $(nproc) && cmake --install .
 ENV ALGO_LIST="${ALGO_LIST} Zstd"
+ENV EXCLUDE_LIBS="${EXCLUDE_LIBS}:libzstd.a"
 
 
 # ==============================================================
@@ -205,8 +212,7 @@ RUN set -e \
     COPT="${EXTRA_GCC_FLAGS} -fcf-protection=full" \
     PG_CPPFLAGS="${CFLAGS}" \
     PG_CFLAGS="-U_FORTIFY_SOURCE" \
-    PG_LDFLAGS="${LDFLAGS} -Wl,-z,now -Wl,-z,cet-report=none -Wl,-Bsymbolic" \
-    SHLIB_LINK="-Bstatic -Wl,--whole-archive \$(STATIC_LIBS) -Wl,--no-whole-archive -Bdynamic \$(SYS_LIBS)"
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS} -Wl,--exclude-libs,${EXCLUDE_LIBS}"
 
 # ==============================================================
 # BUILD RPM PACKAGE PHASE
@@ -243,8 +249,7 @@ make install DESTDIR=%{buildroot} NOLTO=1 STRIP=: \
     COPT="${EXTRA_GCC_FLAGS} -fcf-protection=full" \
     PG_CPPFLAGS="${CFLAGS}" \
     PG_CFLAGS="-U_FORTIFY_SOURCE" \
-    PG_LDFLAGS="${LDFLAGS} -Wl,-z,now -Wl,-z,cet-report=none -Wl,-Bsymbolic" \
-    SHLIB_LINK="-Bstatic -Wl,--whole-archive \$\$(STATIC_LIBS) -Wl,--no-whole-archive -Bdynamic \$\$(SYS_LIBS)"
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS} -Wl,--exclude-libs,${EXCLUDE_LIBS}"
 
 strip --strip-unneeded %{buildroot}/usr/pgsql-${PG_VERSION}/lib/pg_z.so
 chrpath --delete %{buildroot}/usr/pgsql-${PG_VERSION}/lib/pg_z.so
