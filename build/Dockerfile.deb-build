@@ -205,7 +205,10 @@ RUN set -e \
     && make NOLTO=1 STRIP=: \
     BITCODE_CFLAGS="${CFLAGS}" \
     PG_CFLAGS="${CFLAGS}" \
-    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS} -Wl,--exclude-libs,${EXCLUDE_LIBS}"
+    PG_LDFLAGS="${LDFLAGS} ${SYS_LDFLAGS} -Wl,--exclude-libs,${EXCLUDE_LIBS}" \
+    && find ./tmp -name "pg_z.so" -exec strip --strip-unneeded \
+    --remove-section=.comment \
+    --remove-section=.note.GNU-stack {} +
 
 # ==============================================================
 # BUILD RPM PACKAGE PHASE
