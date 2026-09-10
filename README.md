@@ -8,6 +8,8 @@
     * [PostgreSQL-Integrated Memory Management & Parallel Safety](#postgresql-integrated-memory-management--parallel-safety)
     * [Static Huge Pages Support](#static-huge-pages-support)
     * [Tuple-Scoped Context Lifecycle](#tuple-scoped-context-lifecycle)
+    * [Distributed as .rpm and .deb Packages](#distributed-as-rpm-and-deb-packages)
+    * [Support for `zlib-ng`](#support-for-zlib-ng)
 - [Data-Flow with `pg_z`](#data-flow-with-pg_z)
 - [Requirements and Configuration](#requirements-and-configuration)
 - [Database Parameters](#database-parameters)
@@ -106,6 +108,23 @@ processed, all memory allocated by the extension's functions is automatically
 freed. This approach is highly resource-efficient compared to attaching
 allocations to the **Transaction Context**, where a single transaction
 processing millions of tuples would otherwise cause massive memory bloat.
+
+### Distributed as `.rpm` and `.deb` Packages
+
+The `pg_z` extension is distributed as a pre-compiled binary with all
+compression libraries statically linked for Debian and Red Hat-based Linux
+distributions. This deployment model resolves several potential issues:
+- It includes specific versions of compression libraries, decoupling the
+  extension from the library versions installed at the OS level.
+- Statically linking `LZ4` and `Zstandard` avoids symbol collisions with the
+  libraries dynamically linked to PostgreSQL itself. This prevents global
+  runtime conflicts and allows different library versions to coexist.
+
+### Support for `zlib-ng`
+
+The `zlib-ng` library is a modern drop-in replacement for the legacy `zlib`.
+By leveraging hardware acceleration, it can perform `gzip` and `deflate`
+compression several times faster than the original library.
 
 ## Data-Flow with `pg_z`
 
