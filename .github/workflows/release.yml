@@ -56,8 +56,7 @@ jobs:
       - name: Define Global Configuration Parameters
         id: config-provider
         run: |
-          #echo 'PG_VERSIONS=["16", "17", "18"]' >> $GITHUB_OUTPUT
-          echo 'PG_VERSIONS=["18"]' >> $GITHUB_OUTPUT
+          echo 'PG_VERSIONS=["16", "17", "18"]' >> $GITHUB_OUTPUT
 
   # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
