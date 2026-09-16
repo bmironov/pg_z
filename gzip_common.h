@@ -53,7 +53,7 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 
 	int volatile zs_initialized = 0;
 	MY_Z_STREAM zs;
-	MG_GZ_HEADER gif;
+	MY_GZ_HEADER gif;
 	uint8 *volatile out_buf = NULL, *tmp_buf = NULL;
 	struct varlena *out_varlena = NULL;
 	size_t allocated_size = 0, current_used = 0, grow_factor = 0;
