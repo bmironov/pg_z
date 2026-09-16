@@ -145,7 +145,8 @@ make NOLTO=1 STRIP=strip \
 
 # =============== test pg_z via "make installcheck" ================
 export TMP_PGDATA="$(pwd)/build/tmp_pgdata"
-export OPT_PG_DIR="/opt/homebrew/opt/postgresql@${PG_VERSION}"
+export LIB_PG_DIR="/opt/homebrew/lib/postgresql@${PG_VERSION}"
+export EXT_PG_DIR="/opt/homebrew/share/postgresql@${PG_VERSION}/extension"
 
 make install
 
@@ -172,11 +173,11 @@ pg_ctl -D "${TMP_PGDATA}" stop
 RELEASE_STAGE="$(pwd)/build/macos_stage"
 mkdir -p "${RELEASE_STAGE}/lib" "${RELEASE_STAGE}/extension"
 
-cp ${OPT_PG_DIR}/lib/postgresql/pg_z.dylib ${RELEASE_STAGE}/lib/
-cp ${OPT_PG_DIR}/share/postgresql/extension/pg_z* ${RELEASE_STAGE}/extension/
+cp ${LIB_PG_DIR}/pg_z.dylib ${RELEASE_STAGE}/lib/
+cp -r ${EXT_PG_DIR}/pg_z* ${RELEASE_STAGE}/extension/
 
 # --- stripping out debug information ---
-strip -S "${RELEASE_STAGE}/lib/pg_z.dylib"
+strip -S ${RELEASE_STAGE}/lib/pg_z.dylib
 
 # --- Final stage ---
 ARCHIVE_NAME="postgresql-${PG_VERSION}-pg-z_${PG_Z_VERSION}_macos_arm64.tar.gz"
