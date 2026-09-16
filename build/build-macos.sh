@@ -158,7 +158,6 @@ pg_ctl -D "${TMP_PGDATA}" -o "-p ${PGPORT}" -l postgres.log start
 sleep 3
 
 # --- actual tests ---
-cd ${TOP}
 EXIT_CODE=0
 [ -d expected/postgresql-${PG_VERSION} ] && cp expected/postgresql-${PG_VERSION}/*.out expected/
 if ! make installcheck; then
