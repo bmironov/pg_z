@@ -139,7 +139,9 @@ export LIBS="-lc++"
     --with-link-snappy=static \
     --with-link-zstd=static
 
-make NOLTO=1 STRIP=strip
+make NOLTO=1 STRIP=strip \
+    PG_CFLAGS="${CFLAGS}" \
+    PG_LDFLAGS="${LDFLAGS}"
 
 # =============== test pg_z via "make installcheck" ================
 export TMP_INST_DIR="$(pwd)/build/tmp_install"
