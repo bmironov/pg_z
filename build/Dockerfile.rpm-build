@@ -134,7 +134,7 @@ WORKDIR /opt/build/lz4
 RUN curl -L -O "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz" \
     && tar -xzf v${LZ4_VERSION}.tar.gz \
     && cd lz4-${LZ4_VERSION} \
-    && make -C lib clean \
+    && make -C lib clean -j$(nproc) \
     && make -C lib install \
     PREFIX=/opt \
     INCLUDEDIR=/opt/include \

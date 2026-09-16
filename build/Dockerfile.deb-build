@@ -132,12 +132,12 @@ WORKDIR /opt/build/lz4
 RUN curl -L -O "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz" \
     && tar -xzf v${LZ4_VERSION}.tar.gz \
     && cd lz4-${LZ4_VERSION} \
-    && make -C lib clean \
+    && make -C lib clean -j$(nproc) \
     && make -C lib install \
     PREFIX=/opt \
     INCLUDEDIR=/opt/include \
     LIBDIR=/opt/lib64 \
-    CC="gcc -fPIC -g -O3 -DLZ4_API_VISIBILITY=1 -DLZ4F_PUBLISH_STATIC_FUNCTIONS \$(cat /opt/rocky_flags.txt) ${EXTRA_GCC_FLAGS}" \
+    CC="gcc -fPIC -g -O3 -DLZ4_API_VISIBILITY=1 -DLZ4F_PUBLISH_STATIC_FUNCTIONS ${EXTRA_GCC_FLAGS}" \
     # linker gives priority to .so, therefore removing it
     && rm -f /opt/lib64/liblz4.so*
 ENV ALGO_LIST="${ALGO_LIST} Lz4"

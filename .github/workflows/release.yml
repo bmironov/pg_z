@@ -52,6 +52,11 @@ jobs:
           echo "RESOLVED_VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "Pipeline version initialized: v${VERSION}"
 
+      - name: Define Global Configuration Parameters
+        id: config-provider
+        run: |
+          echo 'PG_VERSIONS=["16", "17", "18"]' >> $GITHUB_OUTPUT
+
   # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
   # ==============================================================================
@@ -67,7 +72,7 @@ jobs:
         # Supported Debian and Ubuntu LTS versions
         os_version: [bookworm, trixie, noble, jammy, resolute]
         # Supported PostgreSQL versions
-        pg_version: [16, 17, 18]
+        pg_version: ${{ fromJSON(needs.init.outputs.pg_versions) }}
     steps:
       - name: Checkout Source Code Tree
         uses: actions/checkout@v5
@@ -105,7 +110,7 @@ jobs:
         # Supported Rocky LTS versions
         os_version: [rocky8, rocky9, rocky10]
         # Supported PostgreSQL versions
-        pg_version: [16, 17, 18]
+        pg_version: ${{ fromJSON(needs.init.outputs.pg_versions) }}
 
     steps:
       - name: Checkout Source Code Tree
@@ -126,6 +131,42 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: build/packages/*.rpm
+          retention-days: 1
+          archive: false
+
+  # ==============================================================================
+  # COMPILING STATICALLY LINKED PG_Z NATIVE MACOS ARCHIVE (.TAR.GZ)
+  # ==============================================================================
+  build-macos:
+    if: true
+    name: Compile macOS Package
+    runs-on: macos-latest
+    needs: init
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported PostgreSQL versions
+        pg_version: ${{ fromJSON(needs.init.outputs.pg_versions) }}
+    steps:
+      - name: Checkout Source Code Tree
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.init.outputs.version }}
+
+      - name: Set up Homebrew Dependencies
+        run: |
+          brew update
+          brew install autoconf automake cmake postgresql@${{ matrix.pg_version }}
+
+      - name: Execute Native Apple Silicon Compiler & Regression Test Harness
+        run: |
+          chmod +x ./build/build-macos.sh
+          ./build/build-macos.sh "${{ matrix.pg_version }}" "${{ needs.init.outputs.version }}"
+
+      - name: Stash Compiled macOS Tarballs
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/packages/*.tar.gz
           retention-days: 1
           archive: false
 
