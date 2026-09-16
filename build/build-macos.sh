@@ -76,7 +76,7 @@ workdir ${SRC}/zlib
 curl -L -O "https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VERSION}.tar.gz"
 tar -xzf v${ZLIB_VERSION}.tar.gz
 cd zlib-${ZLIB_VERSION}
-CFLAGS="-fPIC -O3" ./configure --prefix=/opt --static
+CFLAGS="-fPIC -O3" ./configure --prefix=${SRC} --static
 make -j$(sysctl -n hw.ncpu)
 make install
 mkdir -p ${SRC}/lib64 && mv ${SRC}/lib/libz.a ${SRC}/lib64/
