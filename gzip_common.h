@@ -19,6 +19,8 @@ Datum MY_DECOMPRESS(PG_FUNCTION_ARGS);
 #define GZIP_WRAPPER 16 // this bit turns on gzip wrapper
 #define AUTO_FORMAT 32	// this bit turn on auto format decoding, inflate only
 
+#define GZIP_OS_UNIX 3 // GZIP Header OS filesystem codes defined by RFC
+
 /*
  * Custom memory allocator for zlib
  */
@@ -51,6 +53,7 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 
 	int volatile zs_initialized = 0;
 	MY_Z_STREAM zs;
+	MG_GZ_HEADER gif;
 	uint8 *volatile out_buf = NULL, *tmp_buf = NULL;
 	struct varlena *out_varlena = NULL;
 	size_t allocated_size = 0, current_used = 0, grow_factor = 0;
@@ -94,6 +97,19 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 			elog(ERROR, "error running deflateInit2: %d", ret);
 
 		zs_initialized = 1;
+
+		/*
+		 * Enforce deterministic GZIP headers when GZIP wrapper is enabled.
+		 * This overrides the default platform-dependent OS flag (e.g.,
+		 * Mac's 0x13) with a fixed Unix identifier (0x03) to keep regression
+		 * tests stable across CI/CD environments.
+		 */
+		if (window_bits & GZIP_WRAPPER) {
+			memset(&gif, 0, sizeof(gif));
+			gif.os = GZIP_OS_UNIX;
+			if (MY_DEFLATE_SET_HEADER(&zs, &gif) != Z_OK)
+				elog(ERROR, "error running " MY_DEFLATE_SET_HEADER);
+		}
 
 		// rough estimate for gzip format
 		allocated_size = in_size + (in_size / 1000) + 32 + VARHDRSZ;

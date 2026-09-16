@@ -23,7 +23,11 @@ PG_FUNCTION_INFO_V1(pg_gunzip);
 #define MY_INFLATE_INIT2 inflateInit2
 #define MY_INFLATE inflate
 #define MY_INFLATE_END inflateEnd
+#define MY_GZ_HEADER gz_header
+#define MY_DEFLATE_SET_HEADER deflateSetHeader
 #include "gzip_common.h"
+#undef MY_DEFLATE_SET_HEADER
+#undef MY_GZ_HEADER
 #undef MY_INFLATE_END
 #undef MY_INFLATE
 #undef MY_INFLATE_INIT2
