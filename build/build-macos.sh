@@ -37,6 +37,50 @@ fi
 
 mkdir -p "${OPT}/include" "${OPT}/lib64" "${SRC}"
 
+# --- Brotli ---
+workdir ${SRC}/brotli
+curl -L -O "https://github.com/google/brotli/archive/refs/tags/v${BROTLI_VERSION}.tar.gz"
+tar -xzf v${BROTLI_VERSION}.tar.gz
+cd brotli-${BROTLI_VERSION}
+mkdir build && cd build
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_C_VISIBILITY_PRESET=default \
+    -DCMAKE_CXX_VISIBILITY_PRESET=default \
+    -DCMAKE_INSTALL_PREFIX="${OPT}" \
+    -DCMAKE_INSTALL_LIBDIR=lib64
+cmake --build . --parallel $(sysctl -n hw.ncpu)
+cmake --install .
+
+# --- zlib-NG ---
+workdir ${SRC}/zlib-ng
+curl -L -O "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz"
+tar -xzf "${ZLIB_NG_VERSION}.tar.gz"
+cd "zlib-ng-${ZLIB_NG_VERSION}"
+mkdir build && cd build
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DZLIB_COMPAT=OFF \
+    -DZLIB_ENABLE_TESTS=OFF \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_INSTALL_PREFIX="${OPT}" \
+    -DCMAKE_INSTALL_LIBDIR=lib64
+cmake --build . --parallel $(sysctl -n hw.ncpu)
+cmake --install .
+
+# --- zlib ---
+workdir ${SRC}/zlib
+curl -L -O "https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VERSION}.tar.gz"
+tar -xzf v${ZLIB_VERSION}.tar.gz
+cd zlib-${ZLIB_VERSION}
+CFLAGS="-fPIC -O3" ./configure --prefix=/opt --static
+make -j$(sysctl -n hw.ncpu)
+make install
+mkdir -p ${SRC}/lib64 && mv ${SRC}/lib/libz.a ${SRC}/lib64/
+
 # --- LZ4 ---
 workdir ${SRC}/lz4
 curl -L -O "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz"
@@ -49,13 +93,30 @@ make -C lib install \
     LIBDIR=${OPT}/lib64 \
     CC="gcc -fPIC -g -O3"
 
+# --- Snappy ---
+workdir ${SRC}/snappy
+curl -L -O "https://github.com/google/snappy/archive/refs/tags/${SNAPPY_VERSION}.tar.gz"
+tar -xzf "${SNAPPY_VERSION}.tar.gz"
+cd snappy-${SNAPPY_VERSION}
+mkdir build && cd build
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DCMAKE_INSTALL_PREFIX="${OPT}" \
+    -DCMAKE_INSTALL_LIBDIR=lib64
+cmake --build . --parallel $(sysctl -n hw.ncpu)
+cmake --install .
+
 # --- Zstd ---
 workdir ${SRC}/zstd
 curl -L -O "https://github.com/facebook/zstd/archive/refs/tags/v${ZSTD_VERSION}.tar.gz"
 tar -xzf v${ZSTD_VERSION}.tar.gz
 cd zstd-${ZSTD_VERSION}/build/cmake
 mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release \
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DZSTD_BUILD_SHARED=OFF \
     -DZSTD_BUILD_STATIC=ON \
