@@ -65,7 +65,7 @@ cmake --build . --parallel $(sysctl -n hw.ncpu)
 cmake --install .
 
 # =============== pg_z build ================
-cd ${TOP}
+cd ${TOP}/..
 autoreconf -ifv
 export CFLAGS="-I${OPT}/include -pthread -Wno-vla"
 export LDFLAGS="-L${OPT}/lib64"
