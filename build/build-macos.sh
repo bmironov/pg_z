@@ -144,14 +144,10 @@ make NOLTO=1 STRIP=strip \
     PG_LDFLAGS="${LDFLAGS}"
 
 # =============== test pg_z via "make installcheck" ================
-export TMP_INST_DIR="$(pwd)/build/tmp_install"
 export TMP_PGDATA="$(pwd)/build/tmp_pgdata"
 export OPT_PG_DIR="/opt/homebrew/opt/postgresql@${PG_VERSION}"
 
-make install DESTDIR="${TMP_INST_DIR}"
-
-sudo cp ${TMP_INST_DIR}${OPT_PG_DIR}/lib/postgresql/pg_z.dylib ${OPT_PG_DIR}/lib/postgresql/
-sudo cp ${TMP_INST_DIR}${OPT_PG_DIR}/share/postgresql/extension/pg_z* ${OPT_PG_DIR}/share/postgresql/extension/
+make install
 
 # --- Starting DB ---
 export PGPORT=54321
