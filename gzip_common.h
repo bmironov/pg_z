@@ -108,7 +108,9 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 			memset(&gif, 0, sizeof(gif));
 			gif.os = GZIP_OS_UNIX;
 			if (MY_DEFLATE_SET_HEADER(&zs, &gif) != Z_OK)
-				elog(ERROR, "error running " MY_DEFLATE_SET_HEADER);
+				elog(ERROR,
+					 "%s: failed to set initialize GZIP destination headers",
+					 __func__);
 		}
 
 		// rough estimate for gzip format
