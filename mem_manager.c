@@ -11,6 +11,11 @@
 #include <sys/mman.h>
 #endif
 
+// Fix for macOS where this flag is not defined
+#ifndef MAP_HUGETLB
+#define MAP_HUGETLB 0
+#endif
+
 size_t huge_page_size; // actual size of Huge Page on the system
 
 // Flag to ensure we log the mmap failure details exactly once per session
@@ -59,7 +64,9 @@ pg_hybrid_alloc(size_t *size)
 	}
 
 #ifndef _WIN32
-	if (req_size >= huge_page_size && !pg_mem_tracker_overflow()) {
+	// macOS doesn't have MAP_HUGETLB
+	if (MAP_HUGETLB != 0 && req_size >= huge_page_size &&
+		!pg_mem_tracker_overflow()) {
 		// Round up size to closest Huge Page size multiple
 		huge_size = (req_size + (huge_page_size - 1)) & ~(huge_page_size - 1);
 		ptr =
