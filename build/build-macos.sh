@@ -51,10 +51,10 @@ make -C lib install \
 
 # --- Zstd ---
 workdir ${SRC}/zstd
-curl -L -O "https://github.com/facebook/zstd/archive/refs/tags/v${ZSTD_VERSION}.tar.gz" \
-    tar -xzf v${ZSTD_VERSION}.tar.gz
-cd zstd-${ZSTD_VERSION}/build/cmake \
-    mkdir -p build && cd build
+curl -L -O "https://github.com/facebook/zstd/archive/refs/tags/v${ZSTD_VERSION}.tar.gz"
+tar -xzf v${ZSTD_VERSION}.tar.gz
+cd zstd-${ZSTD_VERSION}/build/cmake
+mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DZSTD_BUILD_SHARED=OFF \
