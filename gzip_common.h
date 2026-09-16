@@ -104,7 +104,7 @@ MY_COMPRESS(PG_FUNCTION_ARGS)
 		 * Mac's 0x13) with a fixed Unix identifier (0x03) to keep regression
 		 * tests stable across CI/CD environments.
 		 */
-		if (window_bits & GZIP_WRAPPER) {
+		if (window_bits == (WINDOW_BITS | GZIP_WRAPPER)) {
 			memset(&gif, 0, sizeof(gif));
 			gif.os = GZIP_OS_UNIX;
 			if (MY_DEFLATE_SET_HEADER(&zs, &gif) != Z_OK)
