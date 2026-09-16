@@ -55,13 +55,14 @@ jobs:
       - name: Define Global Configuration Parameters
         id: config-provider
         run: |
-          echo 'PG_VERSIONS=["16", "17", "18"]' >> $GITHUB_OUTPUT
+          #echo 'PG_VERSIONS=["16", "17", "18"]' >> $GITHUB_OUTPUT
+          echo 'PG_VERSIONS=["18"]' >> $GITHUB_OUTPUT
 
   # ==============================================================================
   # COMPILING STATICALLY LINKED PG_Z AS DEBIAN PACKAGES (.DEB)
   # ==============================================================================
   build-deb:
-    if: true
+    if: false
     name: Compile Debian Package
     runs-on: ubuntu-latest
     needs: init
@@ -99,7 +100,7 @@ jobs:
   # COMPILING STATICALLY LINKED PG_Z AS REDHAT PACKAGES (.RPM)
   # ==============================================================================
   build-rpm:
-    if: true
+    if: false
     name: Compile RPM Package
     runs-on: ubuntu-latest
     needs: init
@@ -174,7 +175,7 @@ jobs:
   # UNIFIED RELEASER & ARTIFACT SHIPPER
   # ==============================================================================
   publish-release:
-    if: true
+    if: false
     name: Publish Production GitHub Release
     runs-on: ubuntu-latest
     needs: [init, build-deb, build-rpm]
