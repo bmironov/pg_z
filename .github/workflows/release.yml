@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version-resolver.outputs.RESOLVED_VERSION }}
+      pg_versions: ${{ steps.config-provider.outputs.PG_VERSIONS }}
     steps:
       - name: Checkout Repository Tree for Tag Discovery
         uses: actions/checkout@v5
@@ -178,7 +179,7 @@ jobs:
     if: false
     name: Publish Production GitHub Release
     runs-on: ubuntu-latest
-    needs: [init, build-deb, build-rpm]
+    needs: [init, build-deb, build-rpm, build-macos]
     permissions:
       contents: write
     steps:
