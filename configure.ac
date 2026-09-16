@@ -160,36 +160,41 @@ find_static_lib() {
 # $4 function defined by library (eg, zng_deflate)
 AC_DEFUN([MY_CHECK_LIB], [
     AS_VAR_SET([HAVE_$1], [no])
+    save_LIBS="$LIBS"
 
     AS_IF([test "$MODE" = "static"], [
-        save_LDFLAGS="$LDFLAGS"
-        LDFLAGS="$LDFLAGS -static"
 
-        AC_CHECK_LIB([$3], [$4], [
-            static_file_path=$(find_static_lib "$save_LDFLAGS" "$3")
-            AS_IF([test -n "$static_file_path"], [
-                AS_VAR_APPEND([STATIC_LIBS], [" $static_file_path"])
-            ], [
-                AS_VAR_APPEND([STATIC_LIBS], [" -l$3"])
-            ])
+        static_file_path=$(find_static_lib "$LDFLAGS" "$3")
+        FOUND_FLAG="0"
+
+        AS_IF([test -n "$static_file_path"], [
+            DELTA_LIBS="$static_file_path"
+
+            AC_CHECK_LIB([$3], [$4], [FOUND_FLAG="1"], [], [ $DELTA_LIBS $save_LIBS ])
+        ], [
+            DELTA_LIBS="-l$3"
+            LIBS="$DELTA_LIBS $LIBS"
+
+            AC_CHECK_LIB([$3], [$4], [FOUND_FLAG="1"])
+        ])
+
+        AS_IF([test "$FOUND_FLAG" = "1"], [
+            AS_VAR_APPEND([STATIC_LIBS], [" $DELTA_LIBS"])
             AS_VAR_SET([HAVE_$1], [yes])
         ], [
             AC_MSG_NOTICE([Library lib$3.a is missing. If its functionality is needed, install $1 development package.])
         ])
-
-        LDFLAGS="$save_LDFLAGS"
     ], [
-        save_LIBS="$LIBS"
         LIBS="-l$3 $LIBS"
         AC_CHECK_LIB([$3], [$4], [
             AS_VAR_APPEND([DYNAMIC_LIBS], [" -l$3"])
             AS_VAR_SET([HAVE_$1], [yes])
-            LIBS="$save_LIBS"
         ], [
             AC_MSG_NOTICE([Library lib$3.so is missing. If its functionality is needed, install $1 development package.])
-            LIBS="$save_LIBS"
         ])
     ])
+
+    LIBS="$save_LIBS"
 ])
 
 
@@ -206,9 +211,10 @@ AS_IF([test "x$with_brotli" = "xyes"], [
     ])
 
     save_LIBS="$LIBS"
-    LIBS="$LIBS -lbrotlicommon"
+    LIBS="$LIBS -lbrotlicommon -lm"
     MY_CHECK_LIB([brotli_e], [libbrotli], [brotlienc],    [BrotliEncoderCreateInstance])
     MY_CHECK_LIB([brotli_d], [libbrotli], [brotlidec],    [BrotliDecoderCreateInstance])
+    LIBS="$save_LIBS -lm"
     MY_CHECK_LIB([brotli_c], [libbrotli], [brotlicommon], [BrotliSharedDictionaryCreateInstance])
     LIBS="$save_LIBS"
     AS_IF([test "x$HAVE_brotli_c" = "xyes" -a "x$HAVE_brotli_e" = "xyes" -a "x$HAVE_brotli_d" = "xyes"], [
