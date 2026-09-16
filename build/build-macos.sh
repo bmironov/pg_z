@@ -11,8 +11,8 @@ PG_Z_VERSION=$(get_pg_z_version "$2")
 
 export TOP=$(pwd)
 export PATH="/opt/homebrew/opt/postgresql@${PG_VERSION}/bin:$PATH"
-export OPT=${TOP}/"opt"
-export SRC=${TOP}/"src"
+export OPT=${TOP}/opt
+export SRC=${TOP}/src
 
 usage() {
     echo "Usage:"
@@ -35,7 +35,7 @@ if [ "a$PG_VERSION" == "a" ]; then
     exit $ERR_NOT_ENOUGH_PARAMETERS
 fi
 
-mkdir -p "${OPT}/include" "${OPT}/lib64" "${SRC}"
+mkdir -p ${OPT}/include ${OPT}/lib ${SRC}
 
 # --- Brotli ---
 workdir ${SRC}/brotli
@@ -50,7 +50,7 @@ cmake .. \
     -DCMAKE_C_VISIBILITY_PRESET=default \
     -DCMAKE_CXX_VISIBILITY_PRESET=default \
     -DCMAKE_INSTALL_PREFIX="${OPT}" \
-    -DCMAKE_INSTALL_LIBDIR=lib64
+    -DCMAKE_INSTALL_LIBDIR=lib
 cmake --build . --parallel $(sysctl -n hw.ncpu)
 cmake --install .
 
@@ -67,7 +67,7 @@ cmake .. \
     -DZLIB_ENABLE_TESTS=OFF \
     -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_INSTALL_PREFIX="${OPT}" \
-    -DCMAKE_INSTALL_LIBDIR=lib64
+    -DCMAKE_INSTALL_LIBDIR=lib
 cmake --build . --parallel $(sysctl -n hw.ncpu)
 cmake --install .
 
@@ -79,7 +79,6 @@ cd zlib-${ZLIB_VERSION}
 CFLAGS="-fPIC -O3" ./configure --prefix=${SRC} --static
 make -j$(sysctl -n hw.ncpu)
 make install
-mkdir -p ${SRC}/lib64 && mv ${SRC}/lib/libz.a ${SRC}/lib64/
 
 # --- LZ4 ---
 workdir ${SRC}/lz4
@@ -90,7 +89,7 @@ make -C lib clean
 make -C lib install \
     PREFIX=${OPT} \
     INCLUDEDIR=${OPT}/include \
-    LIBDIR=${OPT}/lib64 \
+    LIBDIR=${OPT}/lib \
     CC="gcc -fPIC -g -O3"
 
 # --- Snappy ---
@@ -105,7 +104,7 @@ cmake .. \
     -DSNAPPY_BUILD_TESTS=OFF \
     -DSNAPPY_BUILD_BENCHMARKS=OFF \
     -DCMAKE_INSTALL_PREFIX="${OPT}" \
-    -DCMAKE_INSTALL_LIBDIR=lib64
+    -DCMAKE_INSTALL_LIBDIR=lib
 cmake --build . --parallel $(sysctl -n hw.ncpu)
 cmake --install .
 
@@ -121,7 +120,7 @@ cmake .. \
     -DZSTD_BUILD_SHARED=OFF \
     -DZSTD_BUILD_STATIC=ON \
     -DCMAKE_INSTALL_PREFIX="${OPT}" \
-    -DCMAKE_INSTALL_LIBDIR=lib64
+    -DCMAKE_INSTALL_LIBDIR=lib
 cmake --build . --parallel $(sysctl -n hw.ncpu)
 cmake --install .
 
@@ -129,7 +128,7 @@ cmake --install .
 cd ${TOP}/..
 autoreconf -ifv
 export CFLAGS="-I${OPT}/include -pthread -Wno-vla"
-export LDFLAGS="-L${OPT}/lib64"
+export LDFLAGS="-L${OPT}/lib"
 
 ./configure \
     --with-link-brotli=static \
