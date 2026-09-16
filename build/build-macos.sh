@@ -4,7 +4,6 @@ set -e
 cd "$(dirname "$0")"
 SCRIPT_NAME=$(basename $0)
 source ./build-common.sh
-mkdir -p "$TARGET_DIR"
 
 PG_VERSION=$1
 PG_Z_VERSION=$(get_pg_z_version "$2")
@@ -35,7 +34,7 @@ if [ "a$PG_VERSION" == "a" ]; then
     exit $ERR_NOT_ENOUGH_PARAMETERS
 fi
 
-mkdir -p ${OPT}/include ${OPT}/lib ${SRC}
+mkdir -p ${OPT}/include ${OPT}/lib ${SRC} ${TARGET_DIR}
 
 # --- Brotli ---
 workdir ${SRC}/brotli
@@ -180,6 +179,7 @@ cp -r ${EXT_PG_DIR}/pg_z* ${RELEASE_STAGE}/extension/
 strip -S ${RELEASE_STAGE}/lib/pg_z.dylib
 
 # --- Final stage ---
+cd ${TOP}
 ARCHIVE_NAME="postgresql-${PG_VERSION}-pg-z_${PG_Z_VERSION}_macos_arm64.tar.gz"
 tar -czf "${TARGET_DIR}/${ARCHIVE_NAME}" -C "${RELEASE_STAGE}" .
 
