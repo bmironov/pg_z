@@ -144,8 +144,13 @@ make NOLTO=1 STRIP=strip \
 
 # =============== test pg_z via "make installcheck" ================
 export TMP_PGDATA="$(pwd)/build/tmp_pgdata"
-export LIB_PG_DIR="/opt/homebrew/lib/postgresql@${PG_VERSION}"
-export EXT_PG_DIR="/opt/homebrew/share/postgresql@${PG_VERSION}/extension"
+if (($PG_VERSION < 17)); then
+    export LIB_PG_DIR="/opt/homebrew/opt/postgresql@${PG_VERSION}/lib/postgresql"
+    export EXT_PG_DIR="/opt/homebrew/opt/postgresql@${PG_VERSION}/share/postgresql@${PG_VERSION}/extension/"
+else
+    export LIB_PG_DIR="/opt/homebrew/lib/postgresql@${PG_VERSION}"
+    export EXT_PG_DIR="/opt/homebrew/share/postgresql@${PG_VERSION}/extension"
+fi
 
 make install
 
