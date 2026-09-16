@@ -129,6 +129,7 @@ cd ${TOP}/..
 autoreconf -ifv
 export CFLAGS="-I${OPT}/include -pthread -Wno-vla"
 export LDFLAGS="-L${OPT}/lib"
+export LIBS="-lc++"
 
 ./configure \
     --with-link-brotli=static \
