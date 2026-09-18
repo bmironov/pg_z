@@ -54,4 +54,67 @@ SELECT convert_from(unzstd('\x28b52ffd202b59010054686520717569636b2062726f776e20
 RESET pg_z.max_size;
 
 
+-- test compression with dictionary
+
+-- dictionary storage table
+CREATE TEMP TABLE test_dictionaries (
+    id int PRIMARY KEY,
+    dict_name text,
+    dict_data bytea
+);
+
+-- Populate with two distinct sample dictionaries mimicking common patterns.
+-- Note: In production, these should be binary dictionary profiles trained
+-- using 'zstd --train'
+INSERT INTO test_dictionaries VALUES
+(1, 'json_dict',   '{"user_id":,"event_type":"","timestamp":,"payload":{}}'::bytea),
+(2, 'log_dict',    'ERROR [form-processor] failed to process request id='::bytea),
+(3, 'lorem_ipsum', 'Lorem ipsum'::bytea);
+
+-- target payloads table
+CREATE TEMP TABLE test_data (
+    id serial PRIMARY KEY,
+    dict_id int,
+    payload text
+);
+
+INSERT INTO test_data (dict_id, payload) VALUES
+(1, '{"user_id":1001,"event_type":"click","timestamp":1711234560,"payload":{"button":"green"}}'),
+(1, '{"user_id":1002,"event_type":"view","timestamp":1711234565,"payload":{"page":"home"}}'),
+(2, 'ERROR [form-processor] failed to process request id=99234, timeout from auth service'),
+(2, 'ERROR [form-processor] failed to process request id=99235, database connection dead lock'),
+(3, repeat('Lorem ipsum dolor', 5)),
+(3, repeat('Lorem ipsum ornare', 5));
+
+-- Test: Data Integrity and Round-trip Verification
+SELECT
+    td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data, 7, 1), dict.dict_data), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+
+
+-- Test: Cache Isolation Validation (Multi-Dictionary Statement Query)
+SELECT
+    td.id,
+    dict.dict_name,
+    octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1)) AS compressed_size,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data, 7, 1), dict.dict_data), 'UTF8') AS verified_text
+FROM test_data td
+JOIN test_dictionaries dict ON td.dict_id = dict.id
+ORDER BY td.id;
+
+-- Test: Compression Efficiency Metrics Comparison
+SELECT
+    td.id,
+    octet_length(td.payload::bytea) AS raw_bytes,
+    octet_length(zstd(td.payload::bytea, 7, 1)) AS vanilla_compressed_bytes,
+    octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1)) AS dict_compressed_bytes,
+    (octet_length(zstd(td.payload::bytea, 7, 1))
+        - octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1))) AS bytes_saved_by_dictionary
+FROM test_data td
+JOIN test_dictionaries dict ON td.dict_id = dict.id;
+
+
 DROP EXTENSION pg_z;

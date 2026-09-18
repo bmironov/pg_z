@@ -40,10 +40,31 @@
      IMMUTABLE STRICT
      PARALLEL SAFE;
 
+ CREATE OR REPLACE FUNCTION zstd(uncompressed bytea, dictionary bytea, compression_level int DEFAULT 7, threads int DEFAULT 1)
+     RETURNS bytea
+     AS 'MODULE_PATHNAME', 'pg_zstd_dict'
+     LANGUAGE 'c'
+     IMMUTABLE
+     PARALLEL SAFE;
+
+ CREATE OR REPLACE FUNCTION zstd(uncompressed text, dictionary bytea, compression_level int DEFAULT 7, threads int DEFAULT 1)
+     RETURNS bytea
+     AS 'MODULE_PATHNAME', 'pg_zstd_dict'
+     LANGUAGE 'c'
+     IMMUTABLE
+     PARALLEL SAFE;
+
 -- unzstd
  CREATE OR REPLACE FUNCTION unzstd(compressed bytea)
      RETURNS bytea
      AS 'MODULE_PATHNAME', 'pg_unzstd'
      LANGUAGE 'c'
      IMMUTABLE STRICT
+     PARALLEL SAFE;
+
+ CREATE OR REPLACE FUNCTION unzstd(compressed bytea, dictionary bytea)
+     RETURNS bytea
+     AS 'MODULE_PATHNAME', 'pg_unzstd'
+     LANGUAGE 'c'
+     IMMUTABLE
      PARALLEL SAFE;
