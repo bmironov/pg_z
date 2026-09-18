@@ -129,4 +129,87 @@ ERROR:  input data is limited by pg_z.max_size (10 bytes)
 SELECT convert_from(unzstd('\x28b52ffd202b59010054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67'::bytea), 'UTF8') AS unzstd_overlimit;
 ERROR:  decompressed output will exceed pg_z.max_size (10 bytes)
 RESET pg_z.max_size;
+-- test compression with dictionary
+-- dictionary storage table
+CREATE TEMP TABLE test_dictionaries (
+    id int PRIMARY KEY,
+    dict_name text,
+    dict_data bytea
+);
+-- Populate with two distinct sample dictionaries mimicking common patterns.
+-- Note: In production, these should be binary dictionary profiles trained
+-- using 'zstd --train'
+INSERT INTO test_dictionaries VALUES
+(1, 'json_dict',   '{"user_id":,"event_type":"","timestamp":,"payload":{}}'::bytea),
+(2, 'log_dict',    'ERROR [form-processor] failed to process request id='::bytea),
+(3, 'lorem_ipsum', 'Lorem ipsum'::bytea);
+-- target payloads table
+CREATE TEMP TABLE test_data (
+    id serial PRIMARY KEY,
+    dict_id int,
+    payload text
+);
+INSERT INTO test_data (dict_id, payload) VALUES
+(1, '{"user_id":1001,"event_type":"click","timestamp":1711234560,"payload":{"button":"green"}}'),
+(1, '{"user_id":1002,"event_type":"view","timestamp":1711234565,"payload":{"page":"home"}}'),
+(2, 'ERROR [form-processor] failed to process request id=99234, timeout from auth service'),
+(2, 'ERROR [form-processor] failed to process request id=99235, database connection dead lock'),
+(3, repeat('Lorem ipsum dolor', 5)),
+(3, repeat('Lorem ipsum ornare', 5));
+-- Test: Data Integrity and Round-trip Verification
+SELECT
+    td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data, 7, 1), dict.dict_data), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+ id | data_restored_perfectly 
+----+-------------------------
+  1 | t
+  2 | t
+  3 | t
+  4 | t
+  5 | t
+  6 | t
+(6 rows)
+
+-- Test: Cache Isolation Validation (Multi-Dictionary Statement Query)
+SELECT
+    td.id,
+    dict.dict_name,
+    octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1)) AS compressed_size,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data, 7, 1), dict.dict_data), 'UTF8') AS verified_text
+FROM test_data td
+JOIN test_dictionaries dict ON td.dict_id = dict.id
+ORDER BY td.id;
+ id |  dict_name  | compressed_size |                                       verified_text                                        
+----+-------------+-----------------+--------------------------------------------------------------------------------------------
+  1 | json_dict   |              61 | {"user_id":1001,"event_type":"click","timestamp":1711234560,"payload":{"button":"green"}}
+  2 | json_dict   |              55 | {"user_id":1002,"event_type":"view","timestamp":1711234565,"payload":{"page":"home"}}
+  3 | log_dict    |              49 | ERROR [form-processor] failed to process request id=99234, timeout from auth service
+  4 | log_dict    |              53 | ERROR [form-processor] failed to process request id=99235, database connection dead lock
+  5 | lorem_ipsum |              24 | Lorem ipsum dolorLorem ipsum dolorLorem ipsum dolorLorem ipsum dolorLorem ipsum dolor
+  6 | lorem_ipsum |              25 | Lorem ipsum ornareLorem ipsum ornareLorem ipsum ornareLorem ipsum ornareLorem ipsum ornare
+(6 rows)
+
+-- Test: Compression Efficiency Metrics Comparison
+SELECT
+    td.id,
+    octet_length(td.payload::bytea) AS raw_bytes,
+    octet_length(zstd(td.payload::bytea, 7, 1)) AS vanilla_compressed_bytes,
+    octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1)) AS dict_compressed_bytes,
+    (octet_length(zstd(td.payload::bytea, 7, 1))
+        - octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1))) AS bytes_saved_by_dictionary
+FROM test_data td
+JOIN test_dictionaries dict ON td.dict_id = dict.id;
+ id | raw_bytes | vanilla_compressed_bytes | dict_compressed_bytes | bytes_saved_by_dictionary 
+----+-----------+--------------------------+-----------------------+---------------------------
+  1 |        89 |                       91 |                    61 |                        30
+  2 |        85 |                       94 |                    55 |                        39
+  3 |        84 |                       87 |                    49 |                        38
+  4 |        88 |                       90 |                    53 |                        37
+  5 |        85 |                       33 |                    24 |                         9
+  6 |        90 |                       34 |                    25 |                         9
+(6 rows)
+
 DROP EXTENSION pg_z;

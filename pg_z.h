@@ -157,6 +157,13 @@ Datum pg_unsnappy(PG_FUNCTION_ARGS);
 
 Datum pg_zstd_lib_details(PG_FUNCTION_ARGS);
 Datum pg_zstd(PG_FUNCTION_ARGS);
+Datum pg_zstd_dict(PG_FUNCTION_ARGS);
+Datum pg_zstd_core(
+		FunctionCallInfo fcinfo,
+		struct varlena *in_varlena,
+		struct varlena *dict_varlena,
+		int compression_level,
+		int threads);
 Datum pg_unzstd(PG_FUNCTION_ARGS);
 
 /*
