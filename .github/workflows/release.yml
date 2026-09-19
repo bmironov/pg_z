@@ -145,6 +145,7 @@ jobs:
     needs: init
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         # Supported PostgreSQL versions
         pg_version: ${{ fromJSON(needs.init.outputs.pg_versions) }}
