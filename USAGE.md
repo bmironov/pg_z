@@ -824,13 +824,9 @@ SELECT zstd('hello world', 7, 2);
 -- Result: \x28b52ffd200b59000068656c6c6f20776f726c64
 
 SELECT zstd('The quick brown fox jumps over the lazy dog');
-                                                    zstd
-------------------------------------------------------------------------------------------------------------
 --Result:  \x28b52ffd202b59010054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67
 
 SELECT zstd('The quick brown fox jumps over the lazy dog', 'The quick brown fox jumps over the lazy'::bytea);
-                   zstd
-------------------------------------------
 --Result:  \x28b52ffd202b5500002020646f67010054a980
 (1 row)
 
@@ -843,6 +839,8 @@ SELECT zstd('The quick brown fox jumps over the lazy dog', 'The quick brown fox 
 
 ```text
 unzstd ( compressed bytea ) → bytea
+
+unzstd ( compressed bytea, dictionary bytea ) → bytea
 ```
 
 #### `unzstd` Description
@@ -856,11 +854,24 @@ The function evaluates the incoming binary blocks. If structural blocks or
 checksum bounds do not match valid Zstandard specifications, execution is
 terminated with an explicit engine error.
 
+The optional `dictionary` parameter accepts a raw pre-trained Zstd dictionary
+`bytea` buffer (typically generated using `zstd --train`). Providing a shared
+dictionary drastically increases compression density for short, repetitive
+data patterns like JSON documents or structured application log lines.
+
 #### `unzstd` Examples
 
 ```sql
 SELECT convert_from(unzstd(zstd('zstd multi-threaded output', 12, 4)), 'UTF8');
 -- Result: zstd multi-threaded output
+
+SELECT convert_from(
+    unzstd(
+        zstd('The quick brown fox jumps over the lazy dog',
+             'The quick brown fox jumps over the lazy'::bytea),
+        'The quick brown fox jumps over the lazy'::bytea), 'UTF8');
+--Result: The quick brown fox jumps over the lazy dog
+
 ```
 
 [1]: https://github.com/google/brotli
