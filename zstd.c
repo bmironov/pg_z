@@ -78,7 +78,7 @@ pg_zstd_free(void *opaque, void *address)
 Datum
 pg_zstd(PG_FUNCTION_ARGS)
 {
-	struct varlena *in_varlena = PG_GETARG_VARLENA_PP(0);
+	struct varlena *volatile in_varlena = PG_GETARG_VARLENA_PP(0);
 	int16 compression_level = PG_GETARG_INT16(1);
 	int16 threads = PG_GETARG_INT16(2);
 	Datum result;
@@ -86,8 +86,18 @@ pg_zstd(PG_FUNCTION_ARGS)
 	if (PG_ARGISNULL(0))
 		PG_RETURN_NULL();
 
-	result =
-			pg_zstd_core(fcinfo, in_varlena, NULL, compression_level, threads);
+	PG_TRY();
+	{
+		result = pg_zstd_core(
+				fcinfo, in_varlena, NULL, compression_level, threads);
+	}
+	PG_CATCH();
+	{
+		PG_FREE_IF_COPY(in_varlena, 0);
+
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
 
 	PG_FREE_IF_COPY(in_varlena, 0);
 	return result;
@@ -99,22 +109,47 @@ pg_zstd(PG_FUNCTION_ARGS)
 Datum
 pg_zstd_dict(PG_FUNCTION_ARGS)
 {
-	struct varlena *in_varlena = PG_GETARG_VARLENA_PP(0);
-	struct varlena *dict_varlena =
-			PG_ARGISNULL(1) ? NULL : PG_GETARG_VARLENA_PP(1);
+	struct varlena *volatile in_varlena = PG_GETARG_VARLENA_PP(0);
+	struct varlena *volatile dict_varlena = NULL;
 	int16 compression_level = PG_GETARG_INT16(2);
 	int16 threads = PG_GETARG_INT16(3);
+	void *dict_data;
+	size_t dict_size;
+	ZSTD_CDict *cdict = NULL;
 	Datum result;
 
 	if (PG_ARGISNULL(0))
 		PG_RETURN_NULL();
 
-	result = pg_zstd_core(
-			fcinfo, in_varlena, dict_varlena, compression_level, threads);
+	PG_TRY();
+	{
+		if (!PG_ARGISNULL(1)) {
+			dict_varlena = PG_GETARG_VARLENA_P(1);
+			dict_data = (void *)VARDATA(dict_varlena);
+			dict_size = VARSIZE(dict_varlena) - VARHDRSZ;
+
+			if (dict_size > 0) {
+				cdict = get_or_create_cdict(
+						fcinfo, dict_data, dict_size, compression_level);
+			}
+		}
+
+		result = pg_zstd_core(
+				fcinfo, in_varlena, cdict, compression_level, threads);
+	}
+	PG_CATCH();
+	{
+		PG_FREE_IF_COPY(in_varlena, 0);
+		if (dict_varlena != NULL)
+			pfree((void *)dict_varlena);
+
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
 
 	PG_FREE_IF_COPY(in_varlena, 0);
 	if (dict_varlena != NULL)
-		PG_FREE_IF_COPY(dict_varlena, 1);
+		pfree((void *)dict_varlena);
 
 	return result;
 }
@@ -127,7 +162,7 @@ Datum
 pg_zstd_core(
 		FunctionCallInfo fcinfo,
 		struct varlena *in_varlena,
-		struct varlena *dict_varlena,
+		ZSTD_CDict *cdict,
 		int compression_level,
 		int threads)
 {
@@ -136,7 +171,6 @@ pg_zstd_core(
 
 	uint8 *volatile out_buf = NULL;
 	ZSTD_CCtx *volatile cctx = NULL;
-	ZSTD_CDict *cdict = NULL;
 
 	struct varlena *out_varlena = NULL;
 	size_t comp_size = 0, max_dst_size = 0;
@@ -166,16 +200,6 @@ pg_zstd_core(
 
 		// Determine safe upper bound for output buffer size
 		max_dst_size = ZSTD_compressBound(in_size);
-
-		if (dict_varlena != NULL) {
-			void *dict_data = (void *)VARDATA_ANY(dict_varlena);
-			size_t dict_size = VARSIZE_ANY_EXHDR(dict_varlena);
-
-			if (dict_size > 0) {
-				cdict = get_or_create_cdict(
-						fcinfo, dict_data, dict_size, compression_level);
-			}
-		}
 
 		if (threads > 1) {
 			cctx = ZSTD_createCCtx();
@@ -322,11 +346,11 @@ pg_unzstd(PG_FUNCTION_ARGS)
 	if (in_size == 0)
 		PG_RETURN_BYTEA_P(in_varlena);
 
-	if (PG_NARGS() >= 2 && !PG_ARGISNULL(1))
-		dict_varlena = PG_GETARG_VARLENA_PP(1);
-
 	PG_TRY();
 	{
+		if (PG_NARGS() >= 2 && !PG_ARGISNULL(1))
+			dict_varlena = PG_GETARG_VARLENA_P(1);
+
 		// Find out the original uncompressed frame size
 		uncompressed_size = ZSTD_getFrameContentSize(in_data, in_size);
 
@@ -405,8 +429,8 @@ pg_unzstd(PG_FUNCTION_ARGS)
 	PG_CATCH();
 	{
 		PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
-		if (PG_NARGS() == 2 && dict_varlena != NULL)
-			PG_FREE_IF_COPY((struct varlena *)dict_varlena, 1);
+		if (dict_varlena != NULL)
+			pfree((void *)dict_varlena);
 		if (dctx != NULL)
 			ZSTD_freeDCtx(dctx);
 		if (out_buf != NULL)
@@ -417,8 +441,8 @@ pg_unzstd(PG_FUNCTION_ARGS)
 	PG_END_TRY();
 
 	PG_FREE_IF_COPY((struct varlena *)in_varlena, 0);
-	if (PG_NARGS() == 2 && dict_varlena != NULL)
-		PG_FREE_IF_COPY((struct varlena *)dict_varlena, 1);
+	if (dict_varlena != NULL)
+		pfree((void *)dict_varlena);
 	ZSTD_freeDCtx(dctx);
 
 	out_varlena = (struct varlena *)out_buf;

@@ -71,7 +71,13 @@ indiscriminately. Route your internal search and user queries to these scopes:
 - **Resource Protection via PG_TRY**: Every function executing external library
   code or allocating dynamic memory MUST wrap its core logic inside a
   `PG_TRY() / PG_CATCH() / PG_END_TRY()` block layout.
-- **Safe Abort Cleanups**: The `PG_CATCH()` block must strictly guarantee the
+- **Register-Safe Exception Architecture**: All row-lifecycle cleanup variables
+  (such as `in_varlena` and `dict_varlena` blocks evaluated during `PG_CATCH`
+  routines) are strictly qualified as `volatile`. This architectural constraint
+  safeguards pointer states across `longjmp` boundaries, preventing aggressive
+  compiler optimization passes (`-O3`, `-flto`) from caching critical memory
+  addresses inside volatile CPU registers.
+- **Safe Abort Cleanups**: The `PG_CATCH()` block guarantees the
   explicit release of intermediate native pointers, compression contexts, and
   temporary memory copies before propagating errors further via `PG_RE_THROW()`.
   This prevents permanent memory leaks when PostgreSQL aborts a query

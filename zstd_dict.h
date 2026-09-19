@@ -8,7 +8,7 @@
 // Local cache structure stored directly inside the function's execution state
 // (fn_extra)
 typedef struct FunctionCDictCache {
-	void *dict_source_addr; // To detect if the dictionary buffer has changed
+	uint32 dict_hash;
 	size_t dict_size;
 	int32 compression_level;
 	ZSTD_CDict *cdict;
@@ -17,7 +17,7 @@ typedef struct FunctionCDictCache {
 // Local cache structure stored directly inside the function's execution state
 // (fn_extra)
 typedef struct FunctionDDictCache {
-	void *dict_source_addr; // To detect if the dictionary buffer changed
+	uint32 dict_hash;
 	size_t dict_size;
 	ZSTD_DDict *ddict;
 } FunctionDDictCache;

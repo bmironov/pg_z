@@ -1,4 +1,5 @@
 #include "zstd_dict.h"
+#include "utils/builtins.h"
 
 /*
  * Callback invoked automatically when PostgreSQL destroys fn_mcxt at the end
@@ -41,6 +42,8 @@ get_or_create_cdict(
 		int32 compression_level)
 {
 	FunctionCDictCache *cache = (FunctionCDictCache *)fcinfo->flinfo->fn_extra;
+	uint32 current_hash =
+			hash_any((const unsigned char *)dict_data, (int)dict_size);
 
 	// First call for this specific function instance in the query execution
 	// tree
@@ -67,7 +70,7 @@ get_or_create_cdict(
 
 	// Recompile if the dictionary data pointer, size, or compression level
 	// changed
-	if (cache->cdict == NULL || cache->dict_source_addr != dict_data ||
+	if (cache->cdict == NULL || cache->dict_hash != current_hash ||
 		cache->dict_size != dict_size ||
 		cache->compression_level != compression_level) {
 		if (cache->cdict != NULL) {
@@ -77,7 +80,7 @@ get_or_create_cdict(
 
 		cache->cdict =
 				ZSTD_createCDict(dict_data, dict_size, compression_level);
-		cache->dict_source_addr = dict_data;
+		cache->dict_hash = current_hash;
 		cache->dict_size = dict_size;
 		cache->compression_level = compression_level;
 
@@ -97,6 +100,8 @@ ZSTD_DDict *
 get_or_create_ddict(FunctionCallInfo fcinfo, void *dict_data, size_t dict_size)
 {
 	FunctionDDictCache *cache = (FunctionDDictCache *)fcinfo->flinfo->fn_extra;
+	uint32 current_hash =
+			hash_any((const unsigned char *)dict_data, (int)dict_size);
 
 	// First call for this specific function instance in the query execution
 	// tree
@@ -122,7 +127,7 @@ get_or_create_ddict(FunctionCallInfo fcinfo, void *dict_data, size_t dict_size)
 	}
 
 	// Recompile if the dictionary data pointer or size changed
-	if (cache->ddict == NULL || cache->dict_source_addr != dict_data ||
+	if (cache->ddict == NULL || cache->dict_hash != current_hash ||
 		cache->dict_size != dict_size) {
 		if (cache->ddict != NULL) {
 			ZSTD_freeDDict(cache->ddict);
@@ -130,7 +135,7 @@ get_or_create_ddict(FunctionCallInfo fcinfo, void *dict_data, size_t dict_size)
 		}
 
 		cache->ddict = ZSTD_createDDict(dict_data, dict_size);
-		cache->dict_source_addr = dict_data;
+		cache->dict_hash = current_hash;
 		cache->dict_size = dict_size;
 
 		if (cache->ddict == NULL)

@@ -1,5 +1,6 @@
 #include <postgres.h>
 
+#include <common/hashfn.h>
 #include <fmgr.h>
 #include <funcapi.h>
 #include <miscadmin.h>
@@ -9,6 +10,8 @@
 #include <utils/guc.h>
 #include <utils/memutils.h>
 #include <varatt.h>
+
+#include <zstd.h>
 
 #ifndef PG_Z_H
 #define PG_Z_H
@@ -161,7 +164,7 @@ Datum pg_zstd_dict(PG_FUNCTION_ARGS);
 Datum pg_zstd_core(
 		FunctionCallInfo fcinfo,
 		struct varlena *in_varlena,
-		struct varlena *dict_varlena,
+		ZSTD_CDict *cdict,
 		int compression_level,
 		int threads);
 Datum pg_unzstd(PG_FUNCTION_ARGS);
