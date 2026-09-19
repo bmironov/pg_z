@@ -63,7 +63,7 @@ Datum
 pg_lz4(PG_FUNCTION_ARGS)
 {
 	struct varlena *volatile in_varlena = PG_GETARG_VARLENA_PP(0);
-	int32 compression_level = PG_GETARG_INT32(1);
+	int16 compression_level = PG_GETARG_INT16(1);
 	const uint8 *in_data = (uint8 *)(VARDATA_ANY(in_varlena));
 	size_t in_size = VARSIZE_ANY_EXHDR(in_varlena);
 

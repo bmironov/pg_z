@@ -26,28 +26,28 @@
 --
 
 -- zstd
- CREATE OR REPLACE FUNCTION zstd(uncompressed bytea, compression_level int DEFAULT 7, threads int DEFAULT 1)
+ CREATE OR REPLACE FUNCTION zstd(uncompressed bytea, compression_level integer DEFAULT 7, threads integer DEFAULT 1)
      RETURNS bytea
      AS 'MODULE_PATHNAME', 'pg_zstd'
      LANGUAGE 'c'
      IMMUTABLE STRICT
      PARALLEL SAFE;
 
- CREATE OR REPLACE FUNCTION zstd(uncompressed text, compression_level int DEFAULT 7, threads int DEFAULT 1)
+ CREATE OR REPLACE FUNCTION zstd(uncompressed text, compression_level integer DEFAULT 7, threads integer DEFAULT 1)
      RETURNS bytea
      AS 'MODULE_PATHNAME', 'pg_zstd'
      LANGUAGE 'c'
      IMMUTABLE STRICT
      PARALLEL SAFE;
 
- CREATE OR REPLACE FUNCTION zstd(uncompressed bytea, dictionary bytea, compression_level int DEFAULT 7, threads int DEFAULT 1)
+ CREATE OR REPLACE FUNCTION zstd(uncompressed bytea, dictionary bytea, compression_level integer DEFAULT 7, threads integer DEFAULT 1)
      RETURNS bytea
      AS 'MODULE_PATHNAME', 'pg_zstd_dict'
      LANGUAGE 'c'
      IMMUTABLE
      PARALLEL SAFE;
 
- CREATE OR REPLACE FUNCTION zstd(uncompressed text, dictionary bytea, compression_level int DEFAULT 7, threads int DEFAULT 1)
+ CREATE OR REPLACE FUNCTION zstd(uncompressed text, dictionary bytea, compression_level integer DEFAULT 7, threads integer DEFAULT 1)
      RETURNS bytea
      AS 'MODULE_PATHNAME', 'pg_zstd_dict'
      LANGUAGE 'c'

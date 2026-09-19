@@ -72,7 +72,7 @@ Datum
 pg_brotli(PG_FUNCTION_ARGS)
 {
 	struct varlena *volatile in_varlena = PG_GETARG_VARLENA_P(0);
-	int32 compression_level = PG_GETARG_INT32(1);
+	int16 compression_level = PG_GETARG_INT16(1);
 	const uint8 *in_data = (const uint8 *)(VARDATA(in_varlena));
 	size_t in_size = VARSIZE(in_varlena) - VARHDRSZ;
 

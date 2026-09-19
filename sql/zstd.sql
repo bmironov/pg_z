@@ -87,9 +87,8 @@ INSERT INTO test_data (dict_id, payload) VALUES
 (3, repeat('Lorem ipsum ornare', 5));
 
 -- Test: Data Integrity and Round-trip Verification
-SELECT
-    td.id,
-    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data, 7, 1), dict.dict_data), 'UTF8')
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), dict.dict_data), 'UTF8')
         = td.payload AS data_restored_perfectly
 FROM test_data td
 LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
@@ -99,8 +98,8 @@ LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
 SELECT
     td.id,
     dict.dict_name,
-    octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1)) AS compressed_size,
-    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data, 7, 1), dict.dict_data), 'UTF8') AS verified_text
+    octet_length(zstd(td.payload::bytea, dict.dict_data)) AS compressed_size,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), dict.dict_data), 'UTF8') AS verified_text
 FROM test_data td
 JOIN test_dictionaries dict ON td.dict_id = dict.id
 ORDER BY td.id;
@@ -109,10 +108,10 @@ ORDER BY td.id;
 SELECT
     td.id,
     octet_length(td.payload::bytea) AS raw_bytes,
-    octet_length(zstd(td.payload::bytea, 7, 1)) AS vanilla_compressed_bytes,
-    octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1)) AS dict_compressed_bytes,
-    (octet_length(zstd(td.payload::bytea, 7, 1))
-        - octet_length(zstd(td.payload::bytea, dict.dict_data, 7, 1))) AS bytes_saved_by_dictionary
+    octet_length(zstd(td.payload::bytea)) AS vanilla_compressed_bytes,
+    octet_length(zstd(td.payload::bytea, dict.dict_data)) AS dict_compressed_bytes,
+    (octet_length(zstd(td.payload::bytea))
+        - octet_length(zstd(td.payload::bytea, dict.dict_data))) AS bytes_saved_by_dictionary
 FROM test_data td
 JOIN test_dictionaries dict ON td.dict_id = dict.id;
 

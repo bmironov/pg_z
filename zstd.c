@@ -79,8 +79,8 @@ Datum
 pg_zstd(PG_FUNCTION_ARGS)
 {
 	struct varlena *in_varlena = PG_GETARG_VARLENA_PP(0);
-	int compression_level = PG_GETARG_INT32(1);
-	int threads = PG_GETARG_INT16(2);
+	int16 compression_level = PG_GETARG_INT16(1);
+	int16 threads = PG_GETARG_INT16(2);
 	Datum result;
 
 	if (PG_ARGISNULL(0))
@@ -102,8 +102,8 @@ pg_zstd_dict(PG_FUNCTION_ARGS)
 	struct varlena *in_varlena = PG_GETARG_VARLENA_PP(0);
 	struct varlena *dict_varlena =
 			PG_ARGISNULL(1) ? NULL : PG_GETARG_VARLENA_PP(1);
-	int compression_level = PG_GETARG_INT32(2);
-	int threads = PG_GETARG_INT16(3);
+	int16 compression_level = PG_GETARG_INT16(2);
+	int16 threads = PG_GETARG_INT16(3);
 	Datum result;
 
 	if (PG_ARGISNULL(0))
