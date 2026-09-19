@@ -75,7 +75,6 @@
         + [`unsnappy` Usage Notes](#unsnappy-usage-notes)
         + [`unsnappy` Examples](#unsnappy-examples)
 - [Zstandard Algorithm (zstd)](#zstandard-algorithm-zstd)
-    * [Zstandard Important Execution Safety Note](#zstandard-important-execution-safety-note)
     * [`zstd`](#zstd)
         + [`zstd` Description](#zstd-description)
         + [`zstd` Usage Notes](#zstd-usage-notes)
@@ -786,29 +785,30 @@ SELECT convert_from(unsnappy(snappy('hello world')), 'UTF8');
 [Zstandard][5] provides real-time compression scenarios with scaling ratios
 comparable to the best archive formats, natively specified in RFC 8878.
 
-### Zstandard Important Execution Safety Note
-
-Unlike the previous algorithms, the `zstd` and `unzstd` functions are explicitly
-designated as **`PARALLEL UNSAFE`**. The underlying C implementation natively
-manages its own operating system worker threads when requested. Marking these
-functions as `PARALLEL UNSAFE` forces PostgreSQL to retain execution inside a
-single query worker model, preventing conflict between the PostgreSQL parallel
-layer and the internal multithreading logic of the Zstandard library.
-
 ### `zstd`
 
 ```text
 zstd ( uncompressed bytea [, compression_level integer [, threads integer ] ] ) → bytea
 
 zstd ( uncompressed text [, compression_level integer [, threads integer ] ] ) → bytea
+
+zstd ( uncompressed bytea, dictionary bytea [, compression_level integer [, threads integer ] ] ) → bytea
+
+zstd ( uncompressed text, dictionary bytea [, compression_level integer [, threads integer ] ] ) → bytea
 ```
 
 #### `zstd` Description
 
-Compresses the input data using the Zstandard (zstd) algorithm wrapper framework.
+Compresses the input data using the Zstandard (zstd) algorithm wrapper
+framework. Supports both standard block compression and high-efficiency
+dictionary-based compression workflows.
 
 #### `zstd` Usage Notes
 
+- The optional `dictionary` parameter accepts a raw pre-trained Zstd dictionary
+  `bytea` buffer (typically generated using `zstd --train`). Providing a shared
+  dictionary drastically increases compression density for short, repetitive
+  data patterns like JSON documents or structured application log lines.
 - The optional `compression_level` parameter accepts integers within the range of
 **`1` to `22`** (with standard levels going up to 19, and levels 20-22 acting
 as ultra-high memory modes). It defaults to `7`.
@@ -822,6 +822,19 @@ times for large text or binary payloads.
 ```sql
 SELECT zstd('hello world', 7, 2);
 -- Result: \x28b52ffd200b59000068656c6c6f20776f726c64
+
+SELECT zstd('The quick brown fox jumps over the lazy dog');
+                                                    zstd
+------------------------------------------------------------------------------------------------------------
+--Result:  \x28b52ffd202b59010054686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67
+
+SELECT zstd('The quick brown fox jumps over the lazy dog', 'The quick brown fox jumps over the lazy'::bytea);
+                   zstd
+------------------------------------------
+--Result:  \x28b52ffd202b5500002020646f67010054a980
+(1 row)
+
+
 ```
 
 ***

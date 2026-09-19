@@ -83,12 +83,31 @@ INSERT INTO test_data (dict_id, payload) VALUES
 (1, '{"user_id":1002,"event_type":"view","timestamp":1711234565,"payload":{"page":"home"}}'),
 (2, 'ERROR [form-processor] failed to process request id=99234, timeout from auth service'),
 (2, 'ERROR [form-processor] failed to process request id=99235, database connection dead lock'),
-(3, repeat('Lorem ipsum dolor', 5)),
-(3, repeat('Lorem ipsum ornare', 5));
+(3, repeat('Lorem ipsum', 5)),
+(3, repeat('Lorem ipsum dolor', 5));
 
 -- Test: Data Integrity and Round-trip Verification
 SELECT td.id,
     convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), dict.dict_data), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+
+-- test decompression with incorrect dictionary
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data)), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), NULL), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), 'wrong one'::bytea), 'UTF8')
         = td.payload AS data_restored_perfectly
 FROM test_data td
 LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;

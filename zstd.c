@@ -387,6 +387,11 @@ pg_unzstd(PG_FUNCTION_ARGS)
 					in_size);
 		}
 
+		if (ZSTD_isError(uncomp_size))
+			elog(ERROR,
+				 "decompression error: %s",
+				 ZSTD_getErrorName(uncomp_size));
+
 		if (uncomp_size > max_uncompressed_size)
 			elog(ERROR,
 				 "decompressed output exceeds pg_z.max_size (%zu bytes)",

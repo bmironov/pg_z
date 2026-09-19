@@ -8,7 +8,8 @@
     * [PostgreSQL-Integrated Memory Management & Parallel Safety](#postgresql-integrated-memory-management--parallel-safety)
     * [Static Huge Pages Support](#static-huge-pages-support)
     * [Tuple-Scoped Context Lifecycle](#tuple-scoped-context-lifecycle)
-    * [Distributed as .rpm and .deb Packages](#distributed-as-rpm-and-deb-packages)
+    * [Advanced Zstandard Multi-Dictionary Architecture](#advanced-zstandard-multi-dictionary-architecture)
+    * [Distributed as `.rpm`, `.deb`, and `.tar.gz` Packages](#distributed-as-rpm-deb-and-targz-packages)
     * [Support for `zlib-ng`](#support-for-zlib-ng)
 - [Data-Flow with `pg_z`](#data-flow-with-pg_z)
 - [Requirements and Configuration](#requirements-and-configuration)
@@ -109,16 +110,37 @@ freed. This approach is highly resource-efficient compared to attaching
 allocations to the **Transaction Context**, where a single transaction
 processing millions of tuples would otherwise cause massive memory bloat.
 
-### Distributed as `.rpm` and `.deb` Packages
+### Advanced Zstandard Multi-Dictionary Architecture
+
+Unlike rigid implementations that bind a single compression dictionary per database
+session or query lifecycle, `pg_z` features an isolated, transaction-safe
+multi-dictionary engine.
+
+This enables advanced operational use cases, such as:
+
+- Processing **multiple distinct dictionaries within a single tuple** (e.g.,
+  compressing a `json_payload` column with a JSON blueprint dictionary while
+  simultaneously compressing a `syslog_data` column with a log dictionary).
+- Executing complex multi-table `JOIN` operations where each relation maps to its
+  own independent, high-density Zstd training profile.
+- Maintaining **O(1) dictionary referencing speed** at scale without cross-talk,
+  context corruption, or backend memory fragmentation.
+
+### Distributed as `.rpm`, `.deb`, and `.tar.gz` Packages
 
 The `pg_z` extension is distributed as a pre-compiled binary with all
 compression libraries statically linked for Debian and Red Hat-based Linux
-distributions. This deployment model resolves several potential issues:
+distributions, alongside a pre-built `.tar.gz` archive for macOS systems.
+This flexible deployment model resolves several potential infrastructure issues:
+
 - It includes specific versions of compression libraries, decoupling the
   extension from the library versions installed at the OS level.
 - Statically linking `LZ4` and `Zstandard` avoids symbol collisions with the
   libraries dynamically linked to PostgreSQL itself. This prevents global
   runtime conflicts and allows different library versions to coexist.
+- The compiled macOS `.tar.gz` package provides immediate drop-in binary
+  compatibility for local development clusters, avoiding complex local toolchain
+  requirements or manual Xcode build configurations.
 
 ### Support for `zlib-ng`
 

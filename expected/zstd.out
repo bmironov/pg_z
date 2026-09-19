@@ -154,8 +154,8 @@ INSERT INTO test_data (dict_id, payload) VALUES
 (1, '{"user_id":1002,"event_type":"view","timestamp":1711234565,"payload":{"page":"home"}}'),
 (2, 'ERROR [form-processor] failed to process request id=99234, timeout from auth service'),
 (2, 'ERROR [form-processor] failed to process request id=99235, database connection dead lock'),
-(3, repeat('Lorem ipsum dolor', 5)),
-(3, repeat('Lorem ipsum ornare', 5));
+(3, repeat('Lorem ipsum', 5)),
+(3, repeat('Lorem ipsum dolor', 5));
 -- Test: Data Integrity and Round-trip Verification
 SELECT td.id,
     convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), dict.dict_data), 'UTF8')
@@ -172,6 +172,25 @@ LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
   6 | t
 (6 rows)
 
+-- test decompression with incorrect dictionary
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data)), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+ERROR:  decompression error: Data corruption detected
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), NULL), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+ERROR:  decompression error: Data corruption detected
+SELECT td.id,
+    convert_from(unzstd(zstd(td.payload::bytea, dict.dict_data), 'wrong one'::bytea), 'UTF8')
+        = td.payload AS data_restored_perfectly
+FROM test_data td
+LEFT JOIN test_dictionaries dict ON td.dict_id = dict.id;
+ERROR:  decompression error: Data corruption detected
 -- Test: Cache Isolation Validation (Multi-Dictionary Statement Query)
 SELECT
     td.id,
@@ -181,14 +200,14 @@ SELECT
 FROM test_data td
 JOIN test_dictionaries dict ON td.dict_id = dict.id
 ORDER BY td.id;
- id |  dict_name  | compressed_size |                                       verified_text                                        
-----+-------------+-----------------+--------------------------------------------------------------------------------------------
+ id |  dict_name  | compressed_size |                                       verified_text                                       
+----+-------------+-----------------+-------------------------------------------------------------------------------------------
   1 | json_dict   |              61 | {"user_id":1001,"event_type":"click","timestamp":1711234560,"payload":{"button":"green"}}
   2 | json_dict   |              55 | {"user_id":1002,"event_type":"view","timestamp":1711234565,"payload":{"page":"home"}}
   3 | log_dict    |              49 | ERROR [form-processor] failed to process request id=99234, timeout from auth service
   4 | log_dict    |              53 | ERROR [form-processor] failed to process request id=99235, database connection dead lock
-  5 | lorem_ipsum |              24 | Lorem ipsum dolorLorem ipsum dolorLorem ipsum dolorLorem ipsum dolorLorem ipsum dolor
-  6 | lorem_ipsum |              25 | Lorem ipsum ornareLorem ipsum ornareLorem ipsum ornareLorem ipsum ornareLorem ipsum ornare
+  5 | lorem_ipsum |              15 | Lorem ipsumLorem ipsumLorem ipsumLorem ipsumLorem ipsum
+  6 | lorem_ipsum |              24 | Lorem ipsum dolorLorem ipsum dolorLorem ipsum dolorLorem ipsum dolorLorem ipsum dolor
 (6 rows)
 
 -- Test: Compression Efficiency Metrics Comparison
@@ -207,8 +226,8 @@ JOIN test_dictionaries dict ON td.dict_id = dict.id;
   2 |        85 |                       94 |                    55 |                        39
   3 |        84 |                       87 |                    49 |                        38
   4 |        88 |                       90 |                    53 |                        37
-  5 |        85 |                       33 |                    24 |                         9
-  6 |        90 |                       34 |                    25 |                         9
+  5 |        55 |                       26 |                    15 |                        11
+  6 |        85 |                       33 |                    24 |                         9
 (6 rows)
 
 DROP EXTENSION pg_z;
